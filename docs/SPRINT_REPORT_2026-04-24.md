@@ -17,6 +17,7 @@
 | Sprint 1: Enum 拡張（事前済み） | ✅ 完走 | 成功（エラー 0） |
 | Sprint 2: 武器 / 弾薬 DT 行構造体 | ✅ 完走 | 成功（エラー 0） |
 | Sprint 3: SaveGame 構造体 | ✅ 完走 | 成功（エラー 0） |
+| Sprint 4: インベントリ基本構造 | ✅ 完走 | 成功（エラー 0） |
 
 ---
 
@@ -36,6 +37,19 @@
 | 新規 | `DataSource/ammo.csv`（代表弾 11 種） |
 | 編集 | `Source/BX/BX.Build.cs`（Niagara 追加） |
 | 新規 | `docs/SPRINT_2_PLAN.md` |
+
+### Sprint 4（feature/sprint-4-inventory → main マージ）
+| 操作 | ファイル |
+|---|---|
+| 新規 | `Source/BX/Public/Items/FBXInventoryTypes.h`（FBXInventorySlotDef + FBXInventoryItemStack） |
+| 新規 | `Source/BX/Public/Data/FBXItemTableRow.h` |
+| 新規 | `Source/BX/Public/Items/Components/AC_BX_Inventory.h` |
+| 新規 | `Source/BX/Private/Items/Components/AC_BX_Inventory.cpp` |
+| 新規 | `DataSource/items.csv`（25 行） |
+| 編集 | `Source/BX/Public/Save/FBXMerchantNetworkState.h`（FBXSavedItemStack → FBXInventoryItemStack） |
+| 編集 | `Source/BX/Public/Save/FBXRunSnapshot.h`（同上） |
+| 編集 | `docs/QUESTIONS.md`（Q-02 クローズ） |
+| 新規 | `docs/SPRINT_4_PLAN.md` |
 
 ### Sprint 3（feature/sprint-3-savegame → main マージ）
 | 操作 | ファイル |
@@ -61,12 +75,16 @@
 | Sprint 1 | 6 | ✅ 成功、エラー 0 |
 | Sprint 2 | 8 | ✅ 成功、エラー 0 |
 | Sprint 3 | 16 | ✅ 成功、エラー 0 |
+| Sprint 4 | 16 | ✅ 成功、エラー 0 |
 
 ---
 
 ## git log（本日セッション分）
 
 ```
+712a48e merge: sprint 4 inventory base
+2a83b3a feat(BX): §15-1 FBXItemTableRow / FBXInventoryTypes / AC_BX_Inventory を実装・FBXSavedItemStack を統合
+3945df0 docs: スプリント 1〜3 実行レポートと QUESTIONS.md を追加
 8e99035 merge: sprint 3 savegame structs
 b7f3bda feat(BX): §16-3(SPEC_GAPS G-01) SaveGame 構造体 6 本と USaveGame_BX を実装
 d2fa0c9 merge: sprint 2 weapon/ammo DT row structs
@@ -108,12 +126,10 @@ SPEC_PartB.md に未収録のため、以下のフィールドが省略・簡略
 
 詳細は `docs/QUESTIONS.md` の Q-01〜Q-05 を参照してください。
 
-### 3. `FBXSavedItemStack` と §15-1 `FBXInventoryItemStack` の統合判断
+### ~~3. `FBXSavedItemStack` と §15-1 `FBXInventoryItemStack` の統合判断~~ ✅ Sprint 4 で解決
 
-Sprint 3 で `FBXSavedItemStack`（セーブ専用の軽量スタック）を
-`FBXMerchantNetworkState.h` 内に暫定定義しました。  
-§15-1 の `FBXInventoryItemStack`（ランタイム用）を実装後に、両者を統合するか
-別型として保持するかを決定してください（`docs/QUESTIONS.md Q-02` 参照）。
+`FBXSavedItemStack` を廃止し `FBXInventoryItemStack`（§15-1-2）に統合済み。
+`FBXMerchantNetworkState.h` / `FBXRunSnapshot.h` の両ファイルを更新した。
 
 ### 4. weapons.csv の `FireModes` 列について
 
