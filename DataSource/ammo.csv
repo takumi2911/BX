@@ -1,0 +1,12 @@
+Name,AmmoId,DisplayName,Caliber,Penetration,Damage,ArmorDamageRatio,FragmentChance,VelocityFactor
+ammo_9mm_fmj,ammo_9mm_fmj,"9mm FMJ",9mm,12.0,34.0,0.90,0.03,1.00
+ammo_9mm_jhp,ammo_9mm_jhp,"9mm JHP",9mm,8.0,40.0,0.75,0.08,0.98
+ammo_57_ap,ammo_57_ap,"5.7 AP",57,24.0,29.0,1.00,0.02,1.05
+ammo_556_fmj,ammo_556_fmj,"5.56 FMJ",556,32.0,44.0,1.05,0.05,1.00
+ammo_556_ap,ammo_556_ap,"5.56 AP",556,39.0,41.0,1.10,0.03,1.02
+ammo_762_fmj,ammo_762_fmj,"7.62 FMJ",762,38.0,58.0,1.12,0.06,0.97
+ammo_762_ap,ammo_762_ap,"7.62 AP",762,47.0,54.0,1.18,0.03,0.99
+ammo_12g_pellet,ammo_12g_pellet,"12G Pellet",12G,3.0,11.0,0.55,0.00,0.90
+ammo_12g_slug,ammo_12g_slug,"12G Slug",12G,18.0,88.0,0.95,0.02,0.93
+ammo_308_fmj,ammo_308_fmj,".308 FMJ",308,46.0,72.0,1.15,0.05,1.00
+ammo_308_ap,ammo_308_ap,".308 AP",308,56.0,68.0,1.22,0.02,1.01
