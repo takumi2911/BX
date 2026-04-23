@@ -13,7 +13,7 @@ enum class EBXGameMode : uint8
     HardcoreMerchant    UMETA(DisplayName = "商人預け保持ハードコア"),
 };
 
-// 武器カテゴリ (SPEC_GAPS G-02)
+// 武器カテゴリ (SPEC §14-4)
 UENUM(BlueprintType)
 enum class EBXWeaponCategory : uint8
 {
@@ -25,7 +25,7 @@ enum class EBXWeaponCategory : uint8
     SR   UMETA(DisplayName = "Sniper Rifle"),
 };
 
-// 射撃モード (SPEC_GAPS G-02)
+// 射撃モード (SPEC §14-4)
 UENUM(BlueprintType)
 enum class EBXFireMode : uint8
 {
@@ -36,20 +36,20 @@ enum class EBXFireMode : uint8
     Bolt        UMETA(DisplayName = "Bolt Action"),
 };
 
-// 被弾部位 (SPEC_GAPS G-03)
+// 被弾部位 — 7部位固定 (SPEC §14-5)
 UENUM(BlueprintType)
 enum class EBXBodyPart : uint8
 {
     Head        UMETA(DisplayName = "Head"),
     Chest       UMETA(DisplayName = "Chest"),
-    Stomach     UMETA(DisplayName = "Stomach"),
+    Abdomen     UMETA(DisplayName = "Abdomen"),
     LeftArm     UMETA(DisplayName = "Left Arm"),
     RightArm    UMETA(DisplayName = "Right Arm"),
     LeftLeg     UMETA(DisplayName = "Left Leg"),
     RightLeg    UMETA(DisplayName = "Right Leg"),
 };
 
-// 防具クラス (SPEC_GAPS G-03)
+// 防具クラス (SPEC §14-5-1)
 UENUM(BlueprintType)
 enum class EBXArmorClass : uint8
 {
@@ -61,7 +61,7 @@ enum class EBXArmorClass : uint8
     Class6 UMETA(DisplayName = "Class 6"),
 };
 
-// ダメージ種別 (CLAUDE.md §8 GameplayTag 体系準拠)
+// ダメージ種別 (SPEC §14-5 / CLAUDE.md §8 GameplayTag 体系準拠)
 UENUM(BlueprintType)
 enum class EBXDamageType : uint8
 {
@@ -73,7 +73,94 @@ enum class EBXDamageType : uint8
     Fire        UMETA(DisplayName = "Fire"),
 };
 
-// 商人 Trust 段階 (SPEC_GAPS G-01: TrustLevel 1〜4)
+// アイテムカテゴリ (SPEC §15-1)
+UENUM(BlueprintType)
+enum class EBXItemCategory : uint8
+{
+    Medical     UMETA(DisplayName = "Medical"),
+    Ammo        UMETA(DisplayName = "Ammo"),
+    Weapon      UMETA(DisplayName = "Weapon"),
+    Armor       UMETA(DisplayName = "Armor"),
+    Food        UMETA(DisplayName = "Food"),
+    Collectible UMETA(DisplayName = "Collectible"),
+    Key         UMETA(DisplayName = "Key"),
+    Equipment   UMETA(DisplayName = "Equipment"),
+    Quest       UMETA(DisplayName = "Quest"),
+    Misc        UMETA(DisplayName = "Misc"),
+};
+
+// インベントリスロット種別 (SPEC §15-1)
+UENUM(BlueprintType)
+enum class EBXInventorySlotType : uint8
+{
+    PrimaryWeapon   UMETA(DisplayName = "Primary Weapon"),
+    Sidearm         UMETA(DisplayName = "Sidearm"),
+    Armor           UMETA(DisplayName = "Armor"),
+    QuickUse        UMETA(DisplayName = "Quick Use"),
+    Pouch           UMETA(DisplayName = "Pouch"),
+    Backpack        UMETA(DisplayName = "Backpack"),
+    Keyring         UMETA(DisplayName = "Keyring"),
+};
+
+// 状態異常分類 (SPEC §15-2)
+UENUM(BlueprintType)
+enum class EBXStatusType : uint8
+{
+    Bleed       UMETA(DisplayName = "Bleed"),
+    Fracture    UMETA(DisplayName = "Fracture"),
+    Pain        UMETA(DisplayName = "Pain"),
+    Dehydration UMETA(DisplayName = "Dehydration"),
+    Fatigue     UMETA(DisplayName = "Fatigue"),
+    Neuro       UMETA(DisplayName = "Neuro Critical"),
+};
+
+// 抽出種別 (SPEC §18-2)
+UENUM(BlueprintType)
+enum class EBXExtractType : uint8
+{
+    Checkpoint  UMETA(DisplayName = "Checkpoint"),
+    Rope        UMETA(DisplayName = "Rope"),
+    Vehicle     UMETA(DisplayName = "Vehicle"),
+    Hidden      UMETA(DisplayName = "Hidden"),
+    Merchant    UMETA(DisplayName = "Merchant"),
+};
+
+// 抽出マーカー表示種別 (SPEC §18-2)
+UENUM(BlueprintType)
+enum class EBXExtractMarkerVisibility : uint8
+{
+    AlwaysVisible   UMETA(DisplayName = "Always Visible"),
+    DiscoveredOnly  UMETA(DisplayName = "Discovered Only"),
+    Conditional     UMETA(DisplayName = "Conditional"),
+    Hidden          UMETA(DisplayName = "Hidden"),
+};
+
+// 商人種別 (SPEC §21-1)
+UENUM(BlueprintType)
+enum class EBXMerchantType : uint8
+{
+    Trader      UMETA(DisplayName = "Trader"),
+    Medic       UMETA(DisplayName = "Medic"),
+    Mechanic    UMETA(DisplayName = "Mechanic"),
+    Courier     UMETA(DisplayName = "Courier"),
+    Informant   UMETA(DisplayName = "Informant"),
+};
+
+// Trust 解放種別 (SPEC §21-1)
+UENUM(BlueprintType)
+enum class EBXMerchantRewardType : uint8
+{
+    ItemPool        UMETA(DisplayName = "Item Pool"),
+    StorageSlots    UMETA(DisplayName = "Storage Slots"),
+    RespawnNode     UMETA(DisplayName = "Respawn Node"),
+    Service         UMETA(DisplayName = "Service"),
+    Discount        UMETA(DisplayName = "Discount"),
+    Quest           UMETA(DisplayName = "Quest"),
+    Conversation    UMETA(DisplayName = "Conversation"),
+    ExtractSupport  UMETA(DisplayName = "Extract Support"),
+};
+
+// 商人 Trust 段階 (SPEC §21-1 / SPEC_GAPS G-01)
 UENUM(BlueprintType)
 enum class EBXTrustLevel : uint8
 {
@@ -83,17 +170,27 @@ enum class EBXTrustLevel : uint8
     Level4 UMETA(DisplayName = "Level 4 - 盟友"),
 };
 
-// 依頼種別 (SPEC_GAPS G-05)
+// 依頼種別 (SPEC §21-2)
 UENUM(BlueprintType)
 enum class EBXQuestType : uint8
 {
-    Delivery        UMETA(DisplayName = "納品"),
-    Recovery        UMETA(DisplayName = "回収"),
-    Investigation   UMETA(DisplayName = "調査"),
-    Elimination     UMETA(DisplayName = "排除"),
-    Transport       UMETA(DisplayName = "搬送"),
-    Liberation      UMETA(DisplayName = "解放"),
-    Special         UMETA(DisplayName = "特殊"),
+    Collect             UMETA(DisplayName = "Collect"),
+    Deliver             UMETA(DisplayName = "Deliver"),
+    Survive             UMETA(DisplayName = "Survive"),
+    Extract             UMETA(DisplayName = "Extract"),
+    Discover            UMETA(DisplayName = "Discover"),
+    Kill                UMETA(DisplayName = "Kill"),
+    UseExtract          UMETA(DisplayName = "Use Extract"),
+    TurnInCollectorItem UMETA(DisplayName = "Turn In Collector Item"),
+};
+
+// 取引画面タブ (SPEC §29-4)
+UENUM(BlueprintType)
+enum class EBXTradeTab : uint8
+{
+    Buy     UMETA(DisplayName = "Buy"),
+    Sell    UMETA(DisplayName = "Sell"),
+    Compare UMETA(DisplayName = "Compare"),
 };
 
 // リスポーンノード種別 (SPEC_GAPS G-06)
