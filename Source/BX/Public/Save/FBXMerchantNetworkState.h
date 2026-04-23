@@ -3,30 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Items/FBXInventoryTypes.h"
 
 #include "FBXMerchantNetworkState.generated.h"
 
-// セーブ用アイテムスタック（ランタイム FBXInventoryItemStack の保存版）
-// 完全定義は §15-1 実装後に FBXInventoryItemStack と統合予定 → docs/QUESTIONS.md Q-02
-USTRUCT(BlueprintType)
-struct BX_API FBXSavedItemStack
-{
-    GENERATED_BODY()
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Save|Inventory")
-    FName ItemId;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Save|Inventory")
-    int32 Quantity = 1;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Save|Inventory")
-    float CurrentDurability = 100.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Save|Inventory")
-    bool bIsFoundInRaid = false;
-};
-
 // 商人 1 人分の状態 (SPEC_GAPS G-01)
+// StoredInventory は FBXInventoryItemStack（§15-1-2）で統一 — Sprint 4 で FBXSavedItemStack を廃止
 USTRUCT(BlueprintType)
 struct BX_API FBXMerchantState
 {
@@ -39,7 +21,7 @@ struct BX_API FBXMerchantState
     int32 TrustPoints = 0;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Save|Merchant")
-    TArray<FBXSavedItemStack> StoredInventory;
+    TArray<FBXInventoryItemStack> StoredInventory;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Save|Merchant")
     TArray<FName> ActiveQuests;
