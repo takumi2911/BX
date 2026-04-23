@@ -63,3 +63,7 @@ node_modules/
 !docs/
 !DataSource/
 !scripts/
+
+# Temporary archives
+*.zip
+
