@@ -18,14 +18,12 @@ ChatGPT と §16-3 を整備する際に確認・追記してください。
 
 ---
 
-## Q-02 FBXSavedItemStack — §15-1 の FBXInventoryItemStack との統合
+## ~~Q-02 FBXSavedItemStack — §15-1 の FBXInventoryItemStack との統合~~ ✅ CLOSED (Sprint 4)
 
-**背景**: §15-1 で `FBXInventoryItemStack`（ランタイム用スタック）が定義されているが、
-セーブ用の型として別途 `FBXSavedItemStack` を `FBXMerchantNetworkState.h` 内に定義した。
-
-**確認事項**:
-- §15-1 実装時に `FBXInventoryItemStack` を整備したら、`FBXSavedItemStack` と統合するか、
-  別型として共存させるか（セーブ軽量化の観点から別型のほうが望ましい場合がある）
+**解決**: `FBXSavedItemStack` を廃止し、§15-1-2 の `FBXInventoryItemStack` に統合した。
+- `FBXInventoryTypes.h` に `FBXInventoryItemStack` を定義
+- `FBXMerchantNetworkState.h` / `FBXRunSnapshot.h` を `FBXInventoryItemStack` に置換
+- 理由: 別構造体を維持すると Save ↔ Runtime 同期バグの温床になるため
 
 ---
 
