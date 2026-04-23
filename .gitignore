@@ -1,0 +1,65 @@
+# ----------------------------------------
+# Unreal Engine 5 .gitignore
+# ----------------------------------------
+
+# Ignore binary / generated dirs
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Platform specific extras
+*.VC.db
+*.opendb
+*.opensdf
+*.sdf
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.VC.opendb
+
+# Compiled source
+*.[Oo]bj
+*.o
+*.lib
+*.a
+*.pdb
+*.ipch
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs / crashes
+*.log
+*.stackdump
+
+# Unreal specific
+CrashReportClient.ini
+*.target
+*.modules
+
+# Node (Claude Code などのツール)
+node_modules/
+
+# Local configuration (secrets etc.)
+.env
+.env.*
+!.env.example
+
+# Keep these
+!Config/
+!Content/
+!Source/
+!Plugins/
+!docs/
+!DataSource/
+!scripts/
