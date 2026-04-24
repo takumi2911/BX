@@ -67,3 +67,7 @@ node_modules/
 # Temporary archives
 *.zip
 
+
+# Claude Code internal files
+.claude/
+

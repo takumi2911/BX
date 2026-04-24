@@ -1,0 +1,9 @@
+Name,StatusId,DisplayName,StatusType,TickIntervalSec,bUsesDuration,BaseDurationSec,DamagePerTick,MoveSpeedRatio,ADSSpeedRatio,StaminaRecoveryRatio,AimStabilityRatio,AudioMuffleRatio,bCanStack,MaxStackCount,UISeverityLevel,CureActionId,RequiredMedItemId,Description
+small_bleed,small_bleed,小出血,Bleed,3.0,True,120.0,2.0,1.0,1.0,1.0,1.0,0.0,True,3,0,apply_bandage,bandage,軽度の切り傷による持続出血。放置すると体力が徐々に低下する。
+large_bleed,large_bleed,大出血,Bleed,2.0,True,60.0,6.0,0.9,0.9,0.8,0.85,0.0,False,1,2,apply_tourniquet,tourniquet,動脈損傷による急速な出血。即時処置が必要。小出血を上書きする。
+leg_fracture,leg_fracture,足骨折,Fracture,0.0,False,0.0,0.0,0.5,1.0,0.7,1.0,0.0,False,1,2,apply_splint,splint,足の骨折。移動速度が大幅に低下しスタミナ回復も阻害される。
+arm_fracture,arm_fracture,腕骨折,Fracture,0.0,False,0.0,0.0,1.0,0.6,1.0,0.6,0.0,False,1,1,apply_splint,splint,腕の骨折。ADS 速度と照準安定が低下する。
+pain,pain,疼痛,Pain,0.0,True,180.0,0.0,0.95,0.85,0.9,0.75,0.0,False,1,1,apply_painkiller,painkiller,痛みによる集中力低下。ADS 速度と照準が不安定になる。
+dehydration,dehydration,脱水,Dehydration,5.0,False,0.0,1.0,0.85,0.9,0.5,0.8,0.0,False,1,1,drink_water,water_bottle,水分不足による体力低下とスタミナ回復阻害。水分補給で解消する。
+fatigue,fatigue,疲労,Fatigue,0.0,False,0.0,0.0,0.9,0.95,0.3,0.9,0.0,False,1,0,rest,,極度の疲労。スタミナ回復が大幅に低下する。回復アイテムが必要。
+neuro_critical,neuro_critical,ニューロクリティカル,Neuro,1.0,True,15.0,8.0,0.7,0.7,0.5,0.5,0.6,False,1,3,inject_neuro,neuro_stim,神経系への致命的ダメージ。15 秒以内に治療しなければ即死。レイド中 1 回限り。
