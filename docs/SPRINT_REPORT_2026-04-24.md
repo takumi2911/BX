@@ -388,3 +388,82 @@ da8424c feat(BX): §29-3/§29-4 商人ハブ ViewModel を実装 (Sprint 10)
 ```
 
 _Sprint 6〜10 自律セッション終了: 2026-04-26_
+
+---
+
+---
+
+# Sprint 11 実行結果 — 2026-04-26
+
+**ブランチ**: `feature/sprint-11-player-base` → main  
+**コミット**: `f9ba803`
+
+## 目的
+
+§23-4 プレイヤー基底クラス `APlayerCharacterBase` を C++ で実装し、PIE で歩き回れる状態への第一歩を作る。
+
+## ビルド結果
+
+✅ **成功 / エラー 0** (UHT 通過 + リンク成功)
+
+## 追加 enum (BXEnums.h)
+
+| enum | 値 |
+|------|----|
+| `EBXViewMode` | First, Third |
+| `EBXLocomotionState` | Idle, Walk, Run, Sprint, Crouch, Prone |
+| `EBXLeanState` | None, Left, Right |
+| `EBXCombatState` | None, Aiming, Firing, Reloading, Switching |
+| `EBXWeaponSlot` | Primary, Secondary, Pistol, Melee |
+| `EBXCarryState` | Normal, Heavy, Overweight |
+| `EBXLanguage` | Japanese, English |
+
+## 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Characters/APlayerCharacterBase.h` | メインヘッダ (5コンポーネント / 24入力アクション / 状態UPROPERTY / 主要関数) |
+| `Source/BX/Private/Characters/APlayerCharacterBase.cpp` | スタブ実装 (入力ハンドラ + UE_LOG / 視点切替 / Save Export/Import) |
+| `Source/BX/Public/Save/FBXPlayerSaveState.h` | §16-4 保存構造体スタブ (FBXHealthState / StatusEffectsState / InventoryState / WeaponHandlerState / FBXPlayerSaveState) |
+| `Source/BX/Public/Characters/Components/AC_BX_HealthBodyParts.h` | 最小スタブ (Sprint XX で実装) |
+| `Source/BX/Public/Characters/Components/AC_BX_WeaponHandler.h` | 最小スタブ (Sprint 14 で実装) |
+| `Source/BX/Public/Characters/Components/AC_BX_PlayerInteraction.h` | 最小スタブ (Sprint 13 で実装) |
+
+## 実装済みコンポーネント
+
+| コンポーネント | 状態 |
+|--------------|------|
+| `Mesh1P` (USkeletalMeshComponent) | ✅ CreateDefaultSubobject |
+| `Mesh3P` (GetMesh() 参照) | ✅ BeginPlay で代入 |
+| `CameraFirstPerson` | ✅ CreateDefaultSubobject |
+| `SpringArm` | ✅ CreateDefaultSubobject |
+| `CameraThirdPerson` | ✅ CreateDefaultSubobject |
+| `InventoryComponent` | ✅ CreateDefaultSubobject |
+| `StatusEffectsComponent` | ✅ CreateDefaultSubobject |
+| `HealthBodyPartsComponent` | スタブ (null) |
+| `WeaponHandlerComponent` | スタブ (null) |
+| `PlayerInteractionComponent` | スタブ (null) |
+
+## 備考
+
+- Enhanced Input の `BindAction` でパラメータ付き binding を利用 (`Input_SwitchWeaponSlot(EBXWeaponSlot)` / `Input_QuickSlotTriggered(int32)`)
+- `Input_MoveTriggered` は `AddMovementInput` で実際に移動できる状態 → PIE 動作確認可能
+- 視点切替 `SetViewMode()` は CameraFirstPerson/ThirdPerson の Active 切替まで実装済み
+
+## ユーザー対応事項 (Blueprint)
+
+```
+## BP 作業手順: BP_BX_Player
+
+1. UE5 エディタ /Content/BX/Blueprints/Player/ を開く
+2. 右クリック → Blueprint Class → APlayerCharacterBase を選択
+3. 名前: BP_BX_Player
+4. BP を開き以下を設定:
+   a. CharacterMovement → MaxWalkSpeed: 400, MaxSprintSpeed: 600
+   b. CameraFirstPerson → Z=64.0 に調整
+   c. Mesh1P に適当なスケルタルメッシュを仮アサイン (なければ省略)
+   d. Project Settings → Maps & Modes → Default Pawn: BP_BX_Player
+   e. IA_BX_Move / IA_BX_Look を作成しアサイン (Vector2D / Vector2D)
+      IMC_BX_Default に WASD (Move) / Mouse XY (Look) を登録
+5. PIE で WASD 歩行・マウス視点が動くことを確認
+```
