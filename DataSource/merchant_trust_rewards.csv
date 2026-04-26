@@ -1,0 +1,6 @@
+Name,RewardId,MerchantId,RequiredTrustLevel,RequiredQuestId,RequiredStoryFlag,RewardType,UnlockTargetId,RewardValueInt,RewardValueFloat,UIMessage,bVisibleBeforeUnlock,PriorityOrder
+reward_minato_storage_01,reward_minato_storage_01,merchant_minato,2,quest_minato_route_02,,StorageSlots,merchant_storage_minato,10,0.0,"ミナトの預かり在庫枠が 10 増加",true,10
+reward_sawabe_respawn_01,reward_sawabe_respawn_01,merchant_sawabe,2,quest_sawabe_medical_02,,RespawnNode,respawn_clinic_backroom,0,0.0,"診療所裏室が再開地点として解放",true,20
+reward_kurogane_repair_02,reward_kurogane_repair_02,merchant_kurogane,3,quest_kurogane_blueprint_01,,Service,service_repair_high,0,0.0,"高品質修理サービス解放",true,30
+reward_yoshinaga_extract_01,reward_yoshinaga_extract_01,merchant_yoshinaga,2,quest_yoshinaga_carry_02,,ExtractSupport,extract_courier_pickup,0,0.0,"運び屋回収便が利用可能になった",true,40
+reward_amagi_discount_01,reward_amagi_discount_01,merchant_amagi,4,,story_tokyo_outerline,Discount,tradepool_amagi_t4,0,0.12,"アマギの情報取引が 12% 割引",false,50
