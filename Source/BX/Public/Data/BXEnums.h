@@ -193,6 +193,20 @@ enum class EBXTradeTab : uint8
     Compare UMETA(DisplayName = "Compare"),
 };
 
+// 医療アイテム種別 (SPEC §15-3)
+UENUM(BlueprintType)
+enum class EBXMedicalType : uint8
+{
+    Bandage     UMETA(DisplayName = "Bandage"),
+    Tourniquet  UMETA(DisplayName = "Tourniquet"),
+    TraumaKit   UMETA(DisplayName = "Trauma Kit"),
+    Splint      UMETA(DisplayName = "Splint"),
+    Painkiller  UMETA(DisplayName = "Painkiller"),
+    Hydration   UMETA(DisplayName = "Hydration"),
+    Surgery     UMETA(DisplayName = "Surgery"),
+    NeuroSaver  UMETA(DisplayName = "Neuro Saver"),
+};
+
 // リスポーンノード種別 (SPEC_GAPS G-06)
 UENUM(BlueprintType)
 enum class EBXRespawnNodeType : uint8
