@@ -1365,3 +1365,2047 @@ med_n15_detail_01,med_n15_01,NeuroSaver,"N-15",1.8,0.0,1,0,0,0,0.0,false,false,f
 - [ ] 被弾で中断する医療品としない医療品を分けて設定できる
 - [ ] `bCanResolveNeuroCritical=true` の医療品でのみ Neuro Critical を解除できる
 - [ ] `MaxCarryPerRaid` を使って N-15 の持込上限を 1 個に設定できる
+
+
+## §23-4 プレイヤー基底クラス
+
+### 概要
+
+本章では、プレイヤーキャラクターの基底クラス `APlayerCharacterBase` を定義する。
+本クラスは、`AC_BX_Inventory`、`AC_BX_StatusEffects`、`AC_BX_HealthBodyParts`、`AC_BX_WeaponHandler`、`AC_BX_PlayerInteraction`、`UBXMedicalUseSubsystem`、`UBXQuestSubsystem`、`UBXMerchantNetworkSubsystem` 等を統合する正本となる Pawn である。
+
+### ASCII クラス階層図
+
+```text
+ACharacter
+└─ APlayerCharacterBase
+   └─ BP_BX_Player
+```
+
+### 仕様
+
+* C++ クラス名は `APlayerCharacterBase` とする。
+* Blueprint 派生は `BP_BX_Player` とする。
+* 役割は以下を統合する。
+  * 入力受付
+  * カメラ・移動・姿勢制御
+  * 各コンポーネント所有
+  * 各 Subsystem との橋渡し
+  * SaveGame との連携
+* 個別ロジック(部位 HP、状態異常、インベントリ等)は本クラス側で持たず、コンポーネント側で持つ。
+* 本クラスは「窓口」であり「正本」を直接持たない。
+
+### 必須コンポーネント
+
+| コンポーネント名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `Mesh1P` | `USkeletalMeshComponent*` | ✅ | 一人称メッシュ |
+| `Mesh3P` | `USkeletalMeshComponent*` | ✅ | 三人称メッシュ(共有) |
+| `CameraFirstPerson` | `UCameraComponent*` | ✅ | 一人称カメラ |
+| `SpringArm` | `USpringArmComponent*` |  | 三人称用 |
+| `CameraThirdPerson` | `UCameraComponent*` |  | 三人称カメラ |
+| `InventoryComponent` | `UAC_BX_Inventory*` | ✅ | 所持品 |
+| `StatusEffectsComponent` | `UAC_BX_StatusEffects*` | ✅ | 状態異常 |
+| `HealthBodyPartsComponent` | `UAC_BX_HealthBodyParts*` | ✅ | 部位 HP |
+| `WeaponHandlerComponent` | `UAC_BX_WeaponHandler*` | ✅ | 武器保持 |
+| `PlayerInteractionComponent` | `UAC_BX_PlayerInteraction*` | ✅ | インタラクト窓口 |
+
+### 入力アクション
+
+| アクション名 | 用途 |
+| --- | --- |
+| `IA_BX_Move` | 移動 |
+| `IA_BX_Look` | 視点回転 |
+| `IA_BX_Jump` | ジャンプ |
+| `IA_BX_Sprint` | スプリント |
+| `IA_BX_Crouch` | しゃがみ |
+| `IA_BX_Prone` | 伏せ |
+| `IA_BX_LeanLeft` | 左リーン |
+| `IA_BX_LeanRight` | 右リーン |
+| `IA_BX_FirePrimary` | 主射撃 |
+| `IA_BX_FireSecondary` | 副射撃 / ADS |
+| `IA_BX_Reload` | リロード |
+| `IA_BX_SwitchWeaponPrimary` | 主武器選択 |
+| `IA_BX_SwitchWeaponSecondary` | 副武器選択 |
+| `IA_BX_SwitchWeaponPistol` | ハンドガン選択 |
+| `IA_BX_SwitchWeaponMelee` | 近接武器選択 |
+| `IA_BX_Holster` | 武器収納 |
+| `IA_BX_Interact` | インタラクト |
+| `IA_BX_MedicalUse` | 医療使用 |
+| `IA_BX_QuickSlot1` | クイックスロット1 |
+| `IA_BX_QuickSlot2` | クイックスロット2 |
+| `IA_BX_QuickSlot3` | クイックスロット3 |
+| `IA_BX_QuickSlot4` | クイックスロット4 |
+| `IA_BX_OpenInventory` | インベントリ画面 |
+| `IA_BX_OpenMap` | マップ画面 |
+
+### 視点・姿勢・移動状態
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `CurrentViewMode` | `EBXViewMode` | ✅ | First / Third |
+| `CurrentLocomotionState` | `EBXLocomotionState` | ✅ | Idle / Walk / Run / Sprint / Crouch / Prone |
+| `CurrentLeanState` | `EBXLeanState` | ✅ | None / Left / Right |
+| `CurrentCombatState` | `EBXCombatState` | ✅ | None / Aiming / Firing / Reloading / Switching |
+| `bIsMedicalUseActive` | `bool` | ✅ | 医療使用中 |
+| `bIsInteractionActive` | `bool` | ✅ | インタラクト進行中 |
+| `bIsExtractingActive` | `bool` | ✅ | 脱出進行中 |
+
+### 状態フラグ
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `bAlive` | `bool` | ✅ | 生存中か |
+| `bUnconscious` | `bool` | ✅ | 失神中か |
+| `bIsInExtractZone` | `bool` | ✅ | 脱出ゾーン内か |
+| `bInputLocked` | `bool` | ✅ | 入力ロック中か |
+| `MovementInputLockTags` | `FGameplayTagContainer` |  | 移動ロックタグ |
+| `CombatInputLockTags` | `FGameplayTagContainer` |  | 戦闘ロックタグ |
+
+### HUD 公開フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `HudCarryWeightKg` | `float` | ✅ | 現在重量 |
+| `HudCarryMaxWeightKg` | `float` | ✅ | 最大重量 |
+| `HudCarryState` | `EBXCarryState` | ✅ | 重量状態 |
+| `HudCurrentLanguage` | `EBXLanguage` | ✅ | 表示言語 |
+| `HudActiveWeaponName` | `FText` |  | 装備武器名 |
+| `HudActiveWeaponAmmoCurrent` | `int32` |  | 現在弾数 |
+| `HudActiveWeaponAmmoMax` | `int32` |  | 最大弾数 |
+| `HudCurrentExtractName` | `FText` |  | 現在脱出ポイント名 |
+| `HudCurrentExtractRemainingSec` | `float` |  | 脱出残り時間 |
+
+### Save 公開構造体(参照用)
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SavedTransform` | `FTransform` | ✅ | 位置姿勢 |
+| `SavedViewMode` | `EBXViewMode` | ✅ | 視点 |
+| `SavedHealthState` | `FBXHealthState` | ✅ | 部位 HP 状態 |
+| `SavedStatusEffectsState` | `FBXStatusEffectsState` | ✅ | 状態異常状態 |
+| `SavedInventoryState` | `FBXInventoryState` | ✅ | 所持品状態 |
+| `SavedWeaponState` | `FBXWeaponHandlerState` | ✅ | 武器状態 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void InitializePlayerCharacter();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void BindAllInputActions(class UEnhancedInputComponent* InputComponent);
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_MoveTriggered(const FInputActionValue& Value);
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_LookTriggered(const FInputActionValue& Value);
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_JumpTriggered();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_SprintStarted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_SprintCompleted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_CrouchToggled();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_ProneToggled();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_LeanLeftStarted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_LeanLeftCompleted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_LeanRightStarted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_LeanRightCompleted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_FirePrimaryStarted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_FirePrimaryCompleted();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_FireSecondaryTriggered();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_ReloadTriggered();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_SwitchWeaponSlot(EBXWeaponSlot WeaponSlot);
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_HolsterTriggered();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_InteractTriggered();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_MedicalUseTriggered();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void Input_QuickSlotTriggered(int32 QuickSlotIndex);
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void SetViewMode(EBXViewMode NewViewMode);
+
+UFUNCTION(BlueprintPure, Category="BX|Player")
+EBXViewMode GetCurrentViewMode() const;
+
+UFUNCTION(BlueprintPure, Category="BX|Player")
+EBXLocomotionState GetCurrentLocomotionState() const;
+
+UFUNCTION(BlueprintPure, Category="BX|Player")
+EBXCombatState GetCurrentCombatState() const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void LockInput(FGameplayTag LockTag);
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void UnlockInput(FGameplayTag LockTag);
+
+UFUNCTION(BlueprintPure, Category="BX|Player")
+bool IsInputLocked() const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Player")
+void NotifyDeathOrUnconscious();
+
+UFUNCTION(BlueprintCallable, Category="BX|Player|Save")
+void ExportPlayerSaveState(FBXPlayerSaveState& OutState) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Player|Save")
+void ImportPlayerSaveState(const FBXPlayerSaveState& InState);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Player")
+void BP_OnViewModeChanged(EBXViewMode NewViewMode);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Player")
+void BP_OnLocomotionStateChanged(EBXLocomotionState NewState);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Player")
+void BP_OnCombatStateChanged(EBXCombatState NewState);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Player")
+void BP_OnPlayerDeath();
+```
+
+### Blueprint / C++ 役割分担
+
+* **C++ 側**:
+  * Pawn 構造定義
+  * 各コンポーネント所有・初期化
+  * 入力受付窓口
+  * 状態遷移と各コンポーネント呼び出し
+  * Save / Load 連携
+* **Blueprint 側**:
+  * `BP_BX_Player` 派生
+  * メッシュ・カメラ・SpringArm のレベル別調整
+  * Anim Blueprint 接続
+  * 入力 Mapping Context 割当
+  * 状態演出
+* **アセット配置先**:
+  * `Source/BX/Public/Characters/APlayerCharacterBase.h`
+  * `Source/BX/Private/Characters/APlayerCharacterBase.cpp`
+  * `Content/BX/Blueprints/Player/BP_BX_Player`
+  * `Content/BX/Input/IA_BX_*`
+
+### 関連章
+
+* §23-5
+* §23-6
+* §23-7
+* §24-1
+* §24-3
+* §16-4
+
+### 受け入れ条件
+
+* [ ] `APlayerCharacterBase` が C++ で定義されている
+* [ ] 必須コンポーネント 9 個が初期化されている
+* [ ] 入力アクション群が `IA_BX_*` でバインドされている
+* [ ] 視点・姿勢・移動・戦闘状態を保持できる
+* [ ] HUD 公開フィールドを保持できる
+* [ ] Save / Load の構造体に変換できる
+* [ ] `GM_BX_Raid` から `BP_BX_Player` を Default Pawn として設定できる
+
+---
+
+## §23-5 武器保持コンポーネント
+
+### 概要
+
+本章では、プレイヤーが装備する武器スロットの保持・切替・装填・射撃モード管理・HUD 公開を担う `AC_BX_WeaponHandler` を定義する。
+C++ クラス名は `UAC_BX_WeaponHandler`、アタッチ名は `AC_BX_WeaponHandler` とする。
+本コンポーネントは武器個体の正本を持ち、`AC_BX_Inventory` の弾薬と連携する。
+
+### ASCII クラス / 依存図
+
+```text
+UActorComponent
+└─ UAC_BX_WeaponHandler
+   └─ owned by APlayerCharacterBase
+
+UAC_BX_WeaponHandler
+├─ reads DT_BX_Weapons
+├─ reads DT_BX_Ammo
+├─ consumes ammo via AC_BX_Inventory
+└─ exposes weapon HUD data
+```
+
+### 仕様
+
+* 武器スロットは `Primary` / `Secondary` / `Pistol` / `Melee` の 4 種を持つ。
+* 各スロットは武器個体 `FBXWeaponInstance` を 0 または 1 個保持できる。
+* 武器個体は `WeaponId`(`DT_BX_Weapons` の主キー)と装填弾薬・残弾・耐久・アタッチメントを保持する。
+* 弾薬の正本は `AC_BX_Inventory` 側にあり、本コンポーネントは「装填済み弾」の正本のみ持つ。
+* 切替は即時切替と長押し収納の双方をサポートする。
+* リロードは中断可能とする。
+* 射撃モードは `Single` / `Burst` / `Auto` から武器ごとに切替可能。
+* HUD には弾数・武器名・射撃モード・耐久を公開する。
+
+### 武器スロット定義
+
+| スロット名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `Primary` | `EBXWeaponSlot` | ✅ | 主武器 |
+| `Secondary` | `EBXWeaponSlot` | ✅ | 副武器 |
+| `Pistol` | `EBXWeaponSlot` | ✅ | ハンドガン |
+| `Melee` | `EBXWeaponSlot` | ✅ | 近接武器 |
+
+### 武器個体構造案
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `WeaponInstanceId` | `FGuid` | ✅ | 武器個体一意 ID |
+| `WeaponId` | `FName` | ✅ | `DT_BX_Weapons` 主キー |
+| `LoadedAmmoId` | `FName` |  | 装填中弾薬種別 |
+| `LoadedAmmoCount` | `int32` | ✅ | 装填済み弾数 |
+| `ChamberLoaded` | `bool` |  | 薬室装填中か |
+| `DurabilityCurrent` | `float` | ✅ | 現在耐久 |
+| `DurabilityMax` | `float` | ✅ | 最大耐久 |
+| `CurrentFireMode` | `EBXFireMode` |  | 現在射撃モード |
+| `Attachments` | `FGameplayTagContainer` |  | アタッチメント |
+
+### 基本フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `OwnerPlayer` | `APlayerCharacterBase*` | ✅ | 所有プレイヤー |
+| `InventoryComponent` | `UAC_BX_Inventory*` | ✅ | 所持品参照 |
+| `EquippedWeapons` | `TMap<EBXWeaponSlot, FBXWeaponInstance>` | ✅ | スロット別武器個体 |
+| `CurrentSlot` | `EBXWeaponSlot` | ✅ | 現在装備スロット |
+| `bIsHolstered` | `bool` | ✅ | 武器収納中か |
+| `bIsReloading` | `bool` | ✅ | リロード中か |
+| `bIsSwitching` | `bool` | ✅ | 切替中か |
+| `bIsAiming` | `bool` | ✅ | ADS 中か |
+| `bIsFiring` | `bool` | ✅ | 射撃中か |
+| `WeaponLockTags` | `FGameplayTagContainer` |  | 武器ロックタグ |
+
+### リロード関連フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `CurrentReloadType` | `EBXReloadType` |  | Tactical / Empty / Single |
+| `ReloadElapsedSec` | `float` |  | 経過時間 |
+| `ReloadRemainingSec` | `float` |  | 残り時間 |
+| `bReloadInterrupted` | `bool` |  | 中断されたか |
+
+### HUD 公開フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `HudActiveWeaponNameJa` | `FText` |  | 日本語武器名 |
+| `HudActiveWeaponNameEn` | `FText` |  | 英語武器名 |
+| `HudActiveWeaponAmmoCurrent` | `int32` | ✅ | 現在装填弾数 |
+| `HudActiveWeaponAmmoMax` | `int32` | ✅ | 最大弾数 |
+| `HudActiveAmmoIdJa` | `FText` |  | 弾薬名(日) |
+| `HudActiveAmmoIdEn` | `FText` |  | 弾薬名(英) |
+| `HudFireMode` | `EBXFireMode` |  | 射撃モード |
+| `HudDurabilityRatio` | `float` |  | 耐久率 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void InitializeWeaponHandler();
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+bool EquipWeaponToSlot(EBXWeaponSlot Slot, const FBXWeaponInstance& WeaponInstance);
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+bool UnequipWeaponFromSlot(EBXWeaponSlot Slot);
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+bool TrySwitchToSlot(EBXWeaponSlot NewSlot);
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void HolsterCurrentWeapon();
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void UnholsterCurrentWeapon();
+
+UFUNCTION(BlueprintPure, Category="BX|Weapon")
+bool HasWeaponInSlot(EBXWeaponSlot Slot) const;
+
+UFUNCTION(BlueprintPure, Category="BX|Weapon")
+EBXWeaponSlot GetCurrentSlot() const;
+
+UFUNCTION(BlueprintPure, Category="BX|Weapon")
+bool GetCurrentWeaponInstance(FBXWeaponInstance& OutInstance) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+bool BeginReload(EBXReloadType ReloadType);
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void TickReload(float DeltaSeconds);
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void InterruptReload();
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void CompleteReload();
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+bool TryFire();
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void StopFire();
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+void SetAimingState(bool bNewAiming);
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon")
+bool CycleFireMode();
+
+UFUNCTION(BlueprintPure, Category="BX|Weapon")
+EBXFireMode GetCurrentFireMode() const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon|Save")
+void ExportWeaponHandlerState(FBXWeaponHandlerState& OutState) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Weapon|Save")
+void ImportWeaponHandlerState(const FBXWeaponHandlerState& InState);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Weapon")
+void BP_OnWeaponSlotChanged(EBXWeaponSlot NewSlot);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Weapon")
+void BP_OnReloadStarted(EBXReloadType ReloadType);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Weapon")
+void BP_OnReloadInterrupted();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Weapon")
+void BP_OnReloadCompleted();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Weapon")
+void BP_OnFire();
+```
+
+### Blueprint / C++ 役割分担
+
+* **C++ 側**:
+  * 武器個体保持
+  * 切替・装填・射撃モード判定
+  * 弾薬整合性
+  * HUD 公開
+  * Save / Load
+* **Blueprint 側**:
+  * 武器メッシュ表示
+  * リロードアニメ
+  * 射撃 VFX / SFX
+  * ADS カメラ制御
+* **アセット配置先**:
+  * `Source/BX/Public/Characters/Components/UAC_BX_WeaponHandler.h`
+  * `Source/BX/Private/Characters/Components/UAC_BX_WeaponHandler.cpp`
+  * `Content/BX/Animations/Weapons/`
+  * `Content/BX/VFX/Weapons/`
+
+### 関連章
+
+* §14-4
+* §14-5
+* §16-4
+* §23-4
+* §24-1
+
+### 受け入れ条件
+
+* [ ] 4 種類のスロット (`Primary`/`Secondary`/`Pistol`/`Melee`) を保持できる
+* [ ] 武器個体 `FBXWeaponInstance` を保持できる
+* [ ] スロット切替が即時 / 長押し収納で動作する
+* [ ] リロードを開始・中断・完了できる
+* [ ] 射撃モードを切替できる
+* [ ] HUD に武器名、弾数、射撃モードを表示できる
+
+
+---
+
+## §23-6 プレイヤー BodyPart / Health コンポーネント
+
+### 概要
+
+本章では、プレイヤーの 7 部位 HP・出血・骨折・痛み・失神・死亡を管理する `AC_BX_HealthBodyParts` を定義する。
+C++ クラス名は `UAC_BX_HealthBodyParts`、アタッチ名は `AC_BX_HealthBodyParts` とする。
+本作の部位構成は **Head / Chest / Abdomen / LeftArm / RightArm / LeftLeg / RightLeg** の 7 部位とする。
+
+### ASCII クラス / 依存図
+
+```text
+UActorComponent
+└─ UAC_BX_HealthBodyParts
+   └─ owned by APlayerCharacterBase
+
+UAC_BX_HealthBodyParts
+├─ updated by damage events
+├─ feeds AC_BX_StatusEffects
+└─ feeds HUD damage UI
+```
+
+### 仕様
+
+* 部位は 7 部位固定。
+* 部位ごとに現在 HP / 最大 HP / 出血段階 / 骨折状態 / 痛み段階を持つ。
+* 部位 HP が 0 になった場合、部位ごとに以下を判定する。
+  * Head 0 → 即死
+  * Chest 0 → 即死(または瀕死状態判定後即死)
+  * Abdomen 0 → 失神 → 出血加速
+  * LeftArm/RightArm 0 → 該当腕の戦闘性能著しく低下
+  * LeftLeg/RightLeg 0 → 該当脚の歩行不能
+* 各部位 HP は医療品で個別回復できる。
+* 出血は時間経過で全体 HP に影響する。
+* 骨折は移動・射撃精度に影響する。
+* 痛みは画面演出と精度低下に影響する。
+* 状態遷移は `AC_BX_StatusEffects` に通知する。
+
+### 部位定義
+
+| 部位名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `Head` | `EBXBodyPart` | ✅ | 頭部 |
+| `Chest` | `EBXBodyPart` | ✅ | 胸部 |
+| `Abdomen` | `EBXBodyPart` | ✅ | 腹部 |
+| `LeftArm` | `EBXBodyPart` | ✅ | 左腕 |
+| `RightArm` | `EBXBodyPart` | ✅ | 右腕 |
+| `LeftLeg` | `EBXBodyPart` | ✅ | 左脚 |
+| `RightLeg` | `EBXBodyPart` | ✅ | 右脚 |
+
+### 部位 HP 構造案
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `BodyPart` | `EBXBodyPart` | ✅ | 部位識別 |
+| `CurrentHp` | `float` | ✅ | 現在 HP |
+| `MaxHp` | `float` | ✅ | 最大 HP |
+| `BleedTier` | `int32` | ✅ | 出血段階(0=なし) |
+| `bIsFractured` | `bool` | ✅ | 骨折中か |
+| `PainTier` | `int32` | ✅ | 痛み段階 |
+| `LastDamageAtUnix` | `int64` |  | 最終被弾時刻 |
+| `StateTags` | `FGameplayTagContainer` |  | 状態タグ |
+
+### 基本フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `OwnerPlayer` | `APlayerCharacterBase*` | ✅ | 所有プレイヤー |
+| `StatusEffectsComponent` | `UAC_BX_StatusEffects*` | ✅ | 状態異常参照 |
+| `BodyPartStates` | `TMap<EBXBodyPart, FBXBodyPartHpState>` | ✅ | 部位状態マップ |
+| `bIsAlive` | `bool` | ✅ | 生存中か |
+| `bIsUnconscious` | `bool` | ✅ | 失神中か |
+| `bIsBleedingActive` | `bool` | ✅ | 出血進行中か |
+| `bIsFracturedAny` | `bool` | ✅ | いずれかが骨折中か |
+| `OverallPainTier` | `int32` | ✅ | 総合痛み段階 |
+| `BleedTickAccumSec` | `float` |  | 出血累積時間 |
+
+### HUD 公開フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `HudHpHead` | `float` | ✅ | 頭部 HP |
+| `HudHpChest` | `float` | ✅ | 胸部 HP |
+| `HudHpAbdomen` | `float` | ✅ | 腹部 HP |
+| `HudHpLeftArm` | `float` | ✅ | 左腕 HP |
+| `HudHpRightArm` | `float` | ✅ | 右腕 HP |
+| `HudHpLeftLeg` | `float` | ✅ | 左脚 HP |
+| `HudHpRightLeg` | `float` | ✅ | 右脚 HP |
+| `HudBleedHead` | `int32` | ✅ | 頭部出血 |
+| `HudBleedChest` | `int32` | ✅ | 胸部出血 |
+| `HudBleedAbdomen` | `int32` | ✅ | 腹部出血 |
+| `HudBleedLeftArm` | `int32` | ✅ | 左腕出血 |
+| `HudBleedRightArm` | `int32` | ✅ | 右腕出血 |
+| `HudBleedLeftLeg` | `int32` | ✅ | 左脚出血 |
+| `HudBleedRightLeg` | `int32` | ✅ | 右脚出血 |
+| `HudFractureFlags` | `int32` | ✅ | 骨折ビットフラグ |
+| `HudPainTier` | `int32` | ✅ | 痛み段階 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void InitializeBodyPartsComponent();
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void ApplyDamageToBodyPart(EBXBodyPart BodyPart, float DamageAmount, FGameplayTagContainer DamageTags);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void HealBodyPart(EBXBodyPart BodyPart, float HealAmount);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void SetBleedTier(EBXBodyPart BodyPart, int32 NewTier);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void StopBleed(EBXBodyPart BodyPart);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void SetFractureState(EBXBodyPart BodyPart, bool bFractured);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void FixFracture(EBXBodyPart BodyPart);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void SetPainTier(int32 NewPainTier);
+
+UFUNCTION(BlueprintCallable, Category="BX|Health")
+void TickBleed(float DeltaSeconds);
+
+UFUNCTION(BlueprintPure, Category="BX|Health")
+float GetBodyPartHp(EBXBodyPart BodyPart) const;
+
+UFUNCTION(BlueprintPure, Category="BX|Health")
+int32 GetBodyPartBleedTier(EBXBodyPart BodyPart) const;
+
+UFUNCTION(BlueprintPure, Category="BX|Health")
+bool IsBodyPartFractured(EBXBodyPart BodyPart) const;
+
+UFUNCTION(BlueprintPure, Category="BX|Health")
+bool IsAlive() const;
+
+UFUNCTION(BlueprintPure, Category="BX|Health")
+bool IsUnconscious() const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Health|Save")
+void ExportHealthState(FBXHealthState& OutState) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Health|Save")
+void ImportHealthState(const FBXHealthState& InState);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Health")
+void BP_OnBodyPartDamaged(EBXBodyPart BodyPart, float DamageAmount);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Health")
+void BP_OnBodyPartZeroed(EBXBodyPart BodyPart);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Health")
+void BP_OnBleedTierChanged(EBXBodyPart BodyPart, int32 NewTier);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Health")
+void BP_OnFractureStateChanged(EBXBodyPart BodyPart, bool bFractured);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Health")
+void BP_OnDeath();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Health")
+void BP_OnUnconscious();
+```
+
+### Blueprint / C++ 役割分担
+
+* **C++ 側**:
+  * 部位 HP 正本
+  * ダメージ適用 / 回復
+  * 出血 / 骨折 / 痛み判定
+  * 死亡 / 失神判定
+  * Save / Load
+* **Blueprint 側**:
+  * HUD 表示
+  * 被弾演出 / 痛み演出
+  * 死亡演出
+* **アセット配置先**:
+  * `Source/BX/Public/Characters/Components/UAC_BX_HealthBodyParts.h`
+  * `Source/BX/Private/Characters/Components/UAC_BX_HealthBodyParts.cpp`
+  * `Content/BX/UI/HUD/`
+
+### 関連章
+
+* §8-2
+* §15-2
+* §16-4
+* §23-4
+* §24-3
+
+### 受け入れ条件
+
+* [ ] 7 部位 (Head/Chest/Abdomen/LeftArm/RightArm/LeftLeg/RightLeg) を保持できる
+* [ ] 各部位の HP / 出血 / 骨折 / 痛みを管理できる
+* [ ] ダメージ適用で HP が減少する
+* [ ] 医療品で部位回復できる
+* [ ] 出血は時間経過で HP に影響する
+* [ ] 死亡 / 失神判定が動作する
+* [ ] HUD に 7 部位の状態を公開できる
+* [ ] Save / Load で復元できる
+
+
+---
+
+## §14-6 防具 DataTable の行構造詳細
+
+### 概要
+
+本章では、`DT_BX_Armors` に格納する防具行構造 `FBXArmorTableRow` を定義する。
+本 DataTable は、装備可能な防具の本体性能・ダメージ軽減・耐久・スロット・互換性を保持する正本となる。
+`AC_BX_Inventory` から装備指示が出され、`UAC_BX_HealthBodyParts` のダメージ計算で参照される。
+
+### ASCII データ参照図
+
+```text
+DT_BX_Armors
+└─ FBXArmorTableRow
+
+Used by:
+├─ AC_BX_Inventory (equip/unequip)
+├─ UAC_BX_HealthBodyParts (damage mitigation)
+├─ Merchant UI (sell/buy/repair)
+└─ Quest / Loot system
+```
+
+### 仕様
+
+* C++ 行構造名は `FBXArmorTableRow` とする。
+* DataTable 名は `DT_BX_Armors` とする。
+* 主キーは `ArmorId` とする。
+* 防具大分類は `ArmorCategory` で表現する (Helmet/BodyArmor/Vest/Plate/Limb)。
+* 防具材質は `ArmorMaterialType` で表現する。
+* カバー部位は `CoveredBodyParts` で表現する。
+* ダメージ軽減は弾種ごとの貫通耐性として保持する。
+* 耐久は `DurabilityCurrent / DurabilityMax` で管理し、攻撃を受けるたびに減少する。
+
+### 防具カテゴリ
+
+| カテゴリ名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `Helmet` | `EBXArmorCategory` | ✅ | ヘルメット |
+| `BodyArmor` | `EBXArmorCategory` | ✅ | ボディアーマー一体型 |
+| `Vest` | `EBXArmorCategory` | ✅ | ベスト |
+| `Plate` | `EBXArmorCategory` | ✅ | プレート |
+| `LimbArmor` | `EBXArmorCategory` | ✅ | 腕脚プロテクター |
+
+### コアフィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `ArmorId` | `FName` | ✅ | 主キー |
+| `DisplayNameJa` | `FText` | ✅ | 日本語表示名 |
+| `DisplayNameEn` | `FText` | ✅ | 英語表示名 |
+| `DescriptionJa` | `FText` |  | 日本語説明 |
+| `DescriptionEn` | `FText` |  | 英語説明 |
+| `ArmorCategory` | `EBXArmorCategory` | ✅ | 大分類 |
+| `MaterialType` | `EBXArmorMaterialType` | ✅ | 材質 |
+| `EquipSlot` | `EBXArmorEquipSlot` | ✅ | 装備スロット |
+| `CoveredBodyParts` | `TArray<EBXBodyPart>` | ✅ | カバー部位 |
+| `WeightKg` | `float` | ✅ | 重量 |
+| `BasePriceCredits` | `int32` | ✅ | 基準価格 |
+| `DurabilityMax` | `float` | ✅ | 最大耐久 |
+| `ArmorClass` | `int32` | ✅ | 防具クラス段階 |
+| `bIsRepairable` | `bool` | ✅ | 修理可能か |
+| `bCanBeStored` | `bool` | ✅ | 商人預け可能か |
+| `bCanBeSold` | `bool` | ✅ | 売却可能か |
+| `LinkedItemId` | `FName` | ✅ | `DT_BX_Items` へのリンク |
+| `IconTexture` | `TSoftObjectPtr<UTexture2D>` | ✅ | アイコン |
+| `MeshAsset` | `TSoftObjectPtr<USkeletalMesh>` |  | メッシュ |
+
+### ダメージ軽減フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `DamageMitigationRatio` | `float` | ✅ | 基本ダメージ軽減率 |
+| `PenetrationResistanceTier` | `int32` | ✅ | 貫通耐性段階 |
+| `BluntDamageTransferRatio` | `float` |  | 鈍器ダメージ透過率 |
+| `MovementSpeedPenalty` | `float` |  | 移動速度ペナルティ |
+| `ErgonomicsPenalty` | `float` |  | 操作性ペナルティ |
+| `SoundResistanceLevel` | `int32` |  | 音抑制段階 |
+
+### 関連章
+
+* §14-4
+* §14-5
+* §16-4
+* §23-6
+* §24-2
+
+### 受け入れ条件
+
+* [ ] `FBXArmorTableRow` が C++ で定義されている
+* [ ] `DT_BX_Armors` が `ArmorId` 主キーで参照できる
+* [ ] 5 種類のカテゴリ (Helmet/BodyArmor/Vest/Plate/LimbArmor) を保持できる
+* [ ] 7 部位のいずれかをカバーできる
+* [ ] 弾種別の貫通耐性段階を持てる
+* [ ] 修理 / 売却 / 預け可否を保持できる
+* [ ] CSV から DataTable へインポートできる
+
+---
+
+## §8-2 ダメージから状態異常への変換仕様
+
+### 概要
+
+本章では、被弾・転倒・酸素不足・薬物副作用などの **ダメージイベント** が、`UAC_BX_HealthBodyParts` と `UAC_BX_StatusEffects` を通じて、出血・骨折・痛み・脳震盪・失神などの **状態異常** に変換されるルールを定義する。
+
+### ASCII フロー図
+
+```text
+DamageEvent (incoming)
+   ↓
+UAC_BX_HealthBodyParts.ApplyDamageToBodyPart()
+   ↓
+[Reduce HP] → [Evaluate Bleed/Fracture/Pain Trigger]
+   ↓                    ↓
+[BleedTier++]    [Fracture=true]    [PainTier++]
+   ↓
+UAC_BX_StatusEffects.ApplyEffect()
+   ↓
+[Add to active effects, broadcast HUD]
+```
+
+### 仕様
+
+* ダメージは `FBXDamageEvent` 構造体で表現する。
+* ダメージ種別は `EBXDamageType` で分類する (Ballistic/Blunt/Explosive/Fall/Poison/Suffocation等)。
+* 部位ごとに「出血しきい値」「骨折しきい値」「痛み加算」を定義する。
+* 出血段階は 0〜3 の 4 段階。
+* 骨折は 0/1 の二値。
+* 痛みは 0〜5 の 6 段階(全身合算)。
+* 状態異常は `AC_BX_StatusEffects` に通知される。
+
+### ダメージイベント構造体
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `DamageEventId` | `FGuid` | ✅ | イベント ID |
+| `TargetBodyPart` | `EBXBodyPart` | ✅ | 被弾部位 |
+| `DamageAmount` | `float` | ✅ | ダメージ量 |
+| `DamageType` | `EBXDamageType` | ✅ | ダメージ種別 |
+| `AmmoIdIfBallistic` | `FName` |  | 弾種(弾薬の場合) |
+| `bAfterArmorMitigation` | `bool` | ✅ | 防具軽減後の値か |
+| `SourceActor` | `AActor*` |  | 加害者参照 |
+| `DamageTags` | `FGameplayTagContainer` |  | 追加タグ |
+
+### 部位別変換ルール表
+
+| 部位 | 出血誘発しきい値 (HP%) | 骨折誘発しきい値 (HP%) | 痛み加算ベース |
+| --- | ---: | ---: | ---: |
+| `Head` | 30 | (なし) | 2 |
+| `Chest` | 35 | 25 | 2 |
+| `Abdomen` | 40 | 30 | 2 |
+| `LeftArm` | 50 | 40 | 1 |
+| `RightArm` | 50 | 40 | 1 |
+| `LeftLeg` | 50 | 35 | 1 |
+| `RightLeg` | 50 | 35 | 1 |
+
+### 関連章
+
+* §14-5
+* §15-2
+* §16-4
+* §23-6
+* §24-3
+
+### 受け入れ条件
+
+* [ ] `FBXDamageEvent` が C++ で定義されている
+* [ ] 部位ごとに出血 / 骨折しきい値が定義されている
+* [ ] ダメージ適用時に状態異常への変換が判定される
+* [ ] 状態異常は `AC_BX_StatusEffects` に通知される
+* [ ] 防具軽減後の値で判定される
+* [ ] HUD に状態異常が反映される
+
+---
+
+## §16-4 SaveGame 参照構造体詳細
+
+### 概要
+
+本章では、`UBXSaveGame` 内で参照される主要構造体を定義する。
+これらの構造体は **プレイヤー進行・部位 HP・状態異常・所持品・武器・依頼・脱出進行・商人状態** を 1 セッション分まとめて保存・復元する正本となる。
+
+### ASCII データ図
+
+```text
+UBXSaveGame
+├─ FBXPlayerProgress
+├─ FBXHealthState
+├─ FBXStatusEffectsState
+├─ FBXInventoryState
+├─ FBXWeaponHandlerState
+├─ FBXQuestProgressState
+├─ FBXExtractionProgressState
+└─ FBXMerchantState[]
+```
+
+### 仕様
+
+* 各構造体は **C++ で定義し USTRUCT(BlueprintType) でマーク**する。
+* 各構造体に `SaveVersion: int32` を持たせ、互換性破壊時に上げる。
+* 構造体は表示文言を保持しない(`FName` ID 参照、UI 側でローカライズ)。
+* `FGuid` は個体識別、`FName` はマスタキー。
+
+### FBXPlayerProgress
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | 構造体バージョン |
+| `PlayerProfileId` | `FGuid` | ✅ | プロフィール ID |
+| `WalletCredits` | `int32` | ✅ | 通貨 |
+| `RaidCount` | `int32` | ✅ | 累計レイド数 |
+| `LastSavedAtUnix` | `int64` | ✅ | 最終保存時刻 |
+| `CurrentRegionId` | `FName` |  | 現在地域 |
+| `UnlockedRegions` | `TArray<FName>` |  | 解放地域 |
+| `UnlockedNodeIds` | `TArray<FName>` |  | 解放ノード |
+| `ProgressTags` | `FGameplayTagContainer` |  | 進行タグ |
+
+### FBXHealthState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `BodyPartStates` | `TArray<FBXBodyPartHpState>` | ✅ | 部位 HP 状態 |
+| `bIsAlive` | `bool` | ✅ | 生存中 |
+| `bIsUnconscious` | `bool` | ✅ | 失神中 |
+| `OverallPainTier` | `int32` | ✅ | 痛み段階 |
+
+### FBXStatusEffectsState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `ActiveEffects` | `TArray<FBXStatusEffectInstance>` | ✅ | 適用中状態異常 |
+
+### FBXInventoryState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `Items` | `TArray<FBXInventoryItemState>` | ✅ | 所持品 |
+| `QuickSlots` | `TArray<FGuid>` |  | クイックスロット |
+| `TotalWeightKg` | `float` | ✅ | 総重量 |
+
+### FBXWeaponHandlerState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `EquippedWeapons` | `TArray<FBXWeaponInstance>` | ✅ | 装備武器個体 |
+| `CurrentSlot` | `EBXWeaponSlot` | ✅ | 現在スロット |
+
+### FBXQuestProgressState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `ActiveQuests` | `TArray<FBXQuestInstance>` | ✅ | 進行中依頼 |
+| `CompletedQuestIds` | `TArray<FName>` | ✅ | 完了済 |
+| `FailedQuestIds` | `TArray<FName>` |  | 失敗済 |
+
+### FBXExtractionProgressState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `bIsExtractionActive` | `bool` | ✅ | 進行中か |
+| `ExtractPointId` | `FName` |  | 脱出ポイント |
+| `RemainingExtractSeconds` | `float` |  | 残り時間 |
+| `ElapsedExtractSeconds` | `float` |  | 経過時間 |
+
+### FBXMerchantState
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `SaveVersion` | `int32` | ✅ | バージョン |
+| `MerchantId` | `FName` | ✅ | 商人 ID |
+| `TrustPoints` | `int32` | ✅ | 信頼ポイント |
+| `TrustLevel` | `int32` | ✅ | 信頼レベル |
+| `StoredItems` | `TArray<FBXInventoryItemState>` |  | 預け在庫 |
+| `StoredCredits` | `int32` |  | 預け通貨 |
+| `bIsUnlocked` | `bool` | ✅ | 解放済みか |
+
+### 関連章
+
+* §15-1
+* §15-2
+* §16-1
+* §23-4
+* §23-5
+* §23-6
+* §24-1
+
+### 受け入れ条件
+
+* [ ] 全ての参照構造体が C++ で定義されている
+* [ ] 各構造体に `SaveVersion` がある
+* [ ] 表示文言をセーブせず ID から UI 側で再生成できる
+
+
+---
+
+## §23-7 プレイヤー Interaction / Loot / Extract 連携
+
+### 概要
+
+本章では、プレイヤーがワールド上の対象へ行う **インタラクト、ルート、脱出開始、依頼関連操作、設備操作** の共通窓口を定義する。
+C++ クラス名は `UAC_BX_PlayerInteraction`、アタッチ名は `AC_BX_PlayerInteraction` とする。
+本コンポーネントは、`APlayerCharacterBase` の視線先 / 近接対象を評価し、`AC_BX_Inventory`、`UBXQuestSubsystem`、`UBXMerchantNetworkSubsystem`、`ABXExtractPointBase` 等へ橋渡しを行う。
+
+### 仕様
+
+* プレイヤーのインタラクト窓口は `AC_BX_PlayerInteraction` とする。
+* 対象検出は **視線中心優先 + 距離判定** を基本とする。
+* 同時に複数対象がある場合は以下の優先順位で解決する。
+  1. `ABXExtractPointBase`
+  2. 依頼関連オブジェクト
+  3. ルートコンテナ / 死体
+  4. ドア / スイッチ / 端末
+  5. その他汎用インタラクト
+* 対象ごとに `EBXInteractTargetType` を持つ。
+* インタラクト中は移動 / 戦闘を部分ロックできる。
+* ルート取得時は `AC_BX_Inventory` に転送要求を送る。
+* 依頼関連対象は `UBXQuestSubsystem` へ通知する。
+* 商人端末やノード端末は `UBXMerchantNetworkSubsystem` へ通知する。
+* 脱出対象は `ABXExtractPointBase` に開始要求を送る。
+* 医療使用中、リロード中、武器切替中などの競合状態では対象に応じて拒否または中断処理を行う。
+
+### 対象種別定義
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `ExtractPoint` | `EBXInteractTargetType` | ✅ | 脱出ポイント |
+| `LootContainer` | `EBXInteractTargetType` | ✅ | ルートコンテナ |
+| `CorpseLoot` | `EBXInteractTargetType` | ✅ | 死体ルート |
+| `Door` | `EBXInteractTargetType` | ✅ | ドア |
+| `Switch` | `EBXInteractTargetType` | ✅ | 電源 / レバー / スイッチ |
+| `Terminal` | `EBXInteractTargetType` | ✅ | 商人 / ノード / 情報端末 |
+| `QuestObject` | `EBXInteractTargetType` | ✅ | 依頼対象オブジェクト |
+| `Pickup` | `EBXInteractTargetType` | ✅ | 地面アイテム拾得 |
+| `Generic` | `EBXInteractTargetType` | ✅ | その他汎用対象 |
+
+### 基本フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `OwnerPlayer` | `APlayerCharacterBase*` | ✅ | 所有プレイヤー |
+| `InventoryComponent` | `UAC_BX_Inventory*` | ✅ | 所持品参照 |
+| `QuestSubsystem` | `UBXQuestSubsystem*` | ✅ | 依頼 Subsystem |
+| `MerchantNetworkSubsystem` | `UBXMerchantNetworkSubsystem*` | ✅ | 商人ネットワーク |
+| `FocusedActor` | `TWeakObjectPtr<AActor>` |  | 現在フォーカス対象 |
+| `FocusedTargetType` | `EBXInteractTargetType` | ✅ | 現在フォーカス種別 |
+| `FocusedDistanceCm` | `float` |  | フォーカス距離 |
+| `bHasValidInteractTarget` | `bool` | ✅ | 有効対象あり |
+| `bIsInteractionInProgress` | `bool` | ✅ | 進行中か |
+| `CurrentInteractionId` | `FGuid` |  | 進行中インタラクト ID |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Interaction")
+void InitializeInteractionComponent();
+
+UFUNCTION(BlueprintCallable, Category="BX|Interaction")
+void RefreshFocusedTarget();
+
+UFUNCTION(BlueprintPure, Category="BX|Interaction")
+bool HasValidFocusedTarget() const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Interaction")
+void RequestInteract();
+
+UFUNCTION(BlueprintCallable, Category="BX|Interaction")
+void BeginHoldInteraction(float RequiredHoldSec);
+
+UFUNCTION(BlueprintCallable, Category="BX|Interaction")
+void TickHoldInteraction(float DeltaSeconds);
+
+UFUNCTION(BlueprintCallable, Category="BX|Interaction")
+void CancelCurrentInteraction();
+
+UFUNCTION(BlueprintCallable, Category="BX|Loot")
+bool TryOpenLootSource(AActor* LootSourceActor);
+
+UFUNCTION(BlueprintCallable, Category="BX|Loot")
+EBXInventoryTransferResult TryTakeItemFromLootSource(FGuid ItemInstanceId, int32 Quantity);
+
+UFUNCTION(BlueprintCallable, Category="BX|Loot")
+EBXInventoryTransferResult TryTakeAllFromLootSource();
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+bool TryBeginExtractAtFocusedPoint();
+
+UFUNCTION(BlueprintCallable, Category="BX|Quest")
+void NotifyQuestObjectInteracted(FName QuestObjectId, FGameplayTag CompletionEventTag);
+
+UFUNCTION(BlueprintCallable, Category="BX|Merchant")
+void NotifyMerchantTerminalUsed(FName NodeOrTerminalId);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Interaction")
+void BP_OnFocusedTargetChanged(AActor* NewFocusedActor, EBXInteractTargetType NewTargetType);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Interaction")
+void BP_OnInteractionStarted(FGuid InteractionId);
+```
+
+### 関連章
+
+* §23-4
+* §24-1
+* §24-2
+* §29-5
+* §31-1
+
+### 受け入れ条件
+
+* [ ] 視線先と近接候補から有効対象を選べる
+* [ ] 脱出ポイント、依頼対象、ルート対象、設備対象を種別判定できる
+* [ ] ルート対象から `AC_BX_Inventory` へ転送要求を送れる
+* [ ] 脱出ポイントへ開始要求を送れる
+* [ ] Quest / MerchantNetwork Subsystem に通知できる
+* [ ] 長押しインタラクトを進行 / 中断できる
+* [ ] HUD に対象名、操作ヒント、不可理由を表示できる
+
+---
+
+## §24-1 インベントリコンポーネント
+
+### 概要
+
+本章では、プレイヤー所持品の正本を管理する `AC_BX_Inventory` の仕様を定義する。
+本コンポーネントはすでに実装済み前提とし、今後の Claude Code 実装・改修時に仕様を固定するための基準として扱う。
+
+### 仕様
+
+* コンポーネント名は `AC_BX_Inventory`、C++ 実装クラスは `UAC_BX_Inventory`。
+* `APlayerCharacterBase` に必須アタッチする。
+* 正本として保持するのは以下:
+  * プレイヤー所持アイテム一覧
+  * スタック数量
+  * 総重量
+  * クイックスロット割当
+* 責務外: 商人預け在庫の正本管理、依頼進行の正本管理、部位体力の正本管理、武器スロットの正本管理。
+* 表示名は保持せず、`ItemId` から `DT_BX_Items` を参照する。
+
+### 基本フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `OwnerPlayer` | `APlayerCharacterBase*` | ✅ | 所有プレイヤー |
+| `InventoryItems` | `TArray<FBXInventoryItemState>` | ✅ | 所持アイテム |
+| `CurrentTotalWeightKg` | `float` | ✅ | 現在総重量 |
+| `MaxCarryWeightKg` | `float` | ✅ | 最大携行重量 |
+| `QuickSlotItemInstanceIds` | `TArray<FGuid>` |  | クイックスロット |
+| `WalletCreditsRuntime` | `int32` |  | レイド中通貨 |
+| `bInventoryDirty` | `bool` | ✅ | dirty フラグ |
+
+### アイテムカテゴリ保持ルール
+
+| カテゴリ | スタック | 個体管理 | クイックスロット | 備考 |
+| --- | --- | --- | --- | --- |
+| `Ammo` | 可 | 不要 | 不可 | 弾種ごと |
+| `Medical` | 可 | 任意 | 可 | 包帯等 |
+| `Consumable` | 可 | 任意 | 可 | 食料 |
+| `Utility` | 可 / 不可 | 任意 | 可 | 用途次第 |
+| `Quest` | 可 / 不可 | 任意 | 原則不可 | 依頼関連 |
+| `KeyItem` | 原則不可 | 可 | 不可 | 鍵 |
+| `Weapon` | 不可 | 必須 | 不可 | §23-5 連携 |
+| `Armor` | 不可 | 必須 | 不可 | 装備連携 |
+| `Attachment` | 可 / 不可 | 可 | 不可 | 個体差 |
+| `Junk` | 可 | 任意 | 不可 | 売却用 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+void InitializeInventoryComponent();
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+EBXInventoryTransferResult TryAddItem(
+    FName ItemId, int32 Quantity, FGuid RequestedInstanceId,
+    bool bAllowCreateNewStack, bool bIgnoreWeightCheck);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+EBXInventoryTransferResult TryRemoveItemByInstanceId(FGuid ItemInstanceId, int32 Quantity);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+EBXInventoryTransferResult TryRemoveItemByItemId(FName ItemId, int32 Quantity);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+void RecalculateTotalWeight();
+
+UFUNCTION(BlueprintPure, Category="BX|Inventory")
+bool CanAcceptAdditionalWeight(float AdditionalWeightKg) const;
+
+UFUNCTION(BlueprintPure, Category="BX|Inventory")
+EBXCarryState GetCarryState() const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+bool AssignItemToQuickSlot(FGuid ItemInstanceId, int32 QuickSlotIndex);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+EBXInventoryTransferResult TryTransferToMerchantStorage(FName MerchantId, FGuid ItemInstanceId, int32 Quantity);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+EBXInventoryTransferResult TrySubmitQuestItem(FName QuestId, FGuid ItemInstanceId, int32 Quantity);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+EBXInventoryTransferResult TryLootFromSource(FName LootSourceId, FGuid ItemInstanceId, int32 Quantity);
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+void ExportInventorySaveState(TArray<FBXInventoryItemState>& OutItems, TArray<FGuid>& OutQuickSlots) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Inventory")
+void ImportInventorySaveState(const TArray<FBXInventoryItemState>& InItems, const TArray<FGuid>& InQuickSlots);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Inventory")
+void BP_OnInventoryChanged();
+```
+
+### 関連章
+
+* §16-4
+* §23-5
+* §23-7
+* §24-2
+* §24-3
+
+### 受け入れ条件
+
+* [ ] `InventoryItems` を正本として保持できる
+* [ ] スタック可能アイテムを既存行へ統合できる
+* [ ] 非スタック品を個体行として保持できる
+* [ ] 総重量を再計算できる
+* [ ] クイックスロットへ割当 / 解除できる
+* [ ] ルート、商人預け、依頼納品の転送要求を送れる
+* [ ] Save / Load で所持品とクイックスロットを復元できる
+* [ ] HUD に重量と所持数を表示できる
+
+---
+
+## §24-2 アイテム DataTable の行構造詳細
+
+### 概要
+
+本章では、`DT_BX_Items` に格納するアイテム行構造 `FBXItemTableRow` を定義する。
+本 DataTable は、インベントリ、ルート、商人売買、依頼品判定、医療 / 消耗品使用、重量計算、日英表示の正本となる。
+
+### 仕様
+
+* C++ 行構造名は `FBXItemTableRow`、DataTable 名は `DT_BX_Items`、主キーは `ItemId`。
+* 表示文字列は日英対応のため、日本語 / 英語を個別に保持する。
+* スタック、重量、価格、カテゴリ、使用可否、商人カテゴリ、依頼フラグを必須項目として持つ。
+* 武器本体は `DT_BX_Weapons`、防具本体は `DT_BX_Armors` へ接続できるようにする。
+
+### コアフィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `ItemId` | `FName` | ✅ | 主キー |
+| `DisplayNameJa` | `FText` | ✅ | 日本語表示名 |
+| `DisplayNameEn` | `FText` | ✅ | 英語表示名 |
+| `DescriptionJa` | `FText` |  | 日本語説明 |
+| `DescriptionEn` | `FText` |  | 英語説明 |
+| `ItemCategory` | `EBXItemCategory` | ✅ | 大分類 |
+| `Rarity` | `EBXItemRarity` |  | レアリティ |
+| `bIsStackable` | `bool` | ✅ | スタック可能か |
+| `MaxStackSize` | `int32` | ✅ | 最大スタック数 |
+| `WeightPerUnitKg` | `float` | ✅ | 1 個あたり重量 |
+| `BasePriceCredits` | `int32` | ✅ | 基準価格 |
+| `PriceVarianceRatio` | `float` | ✅ | 価格変動率 |
+| `bCanSellToTrader` | `bool` | ✅ | 商人売却可能か |
+| `bCanStoreAtMerchant` | `bool` | ✅ | 商人預け可能か |
+| `bUsableInRaid` | `bool` | ✅ | レイド中使用可能か |
+| `bUsableFromQuickSlot` | `bool` | ✅ | クイックスロット使用可能か |
+| `bIsQuestItem` | `bool` | ✅ | 依頼関連か |
+| `bIsKeyItem` | `bool` | ✅ | 鍵か |
+| `TraderCategoryTag` | `FGameplayTagContainer` | ✅ | 商人表示分類 |
+
+### カテゴリ別追加フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `UseActionType` | `EBXItemUseActionType` |  | 使用アクション種別 |
+| `UseDurationSec` | `float` |  | 使用時間 |
+| `HealHead` | `float` |  | 頭部回復 |
+| `HealChest` | `float` |  | 胸部回復 |
+| `HealAbdomen` | `float` |  | 腹部回復 |
+| `HealLeftArm` | `float` |  | 左腕回復 |
+| `HealRightArm` | `float` |  | 右腕回復 |
+| `HealLeftLeg` | `float` |  | 左脚回復 |
+| `HealRightLeg` | `float` |  | 右脚回復 |
+| `BleedStopPower` | `int32` |  | 止血段階 |
+| `FractureFixPower` | `int32` |  | 骨折治療段階 |
+| `PainkillerPower` | `int32` |  | 鎮痛段階 |
+| `Caliber` | `FName` |  | 弾薬口径 |
+| `AmmoCountPerItem` | `int32` |  | 弾数/個 |
+| `KeyAccessTag` | `FGameplayTag` |  | 解錠タグ |
+| `LinkedWeaponId` | `FName` |  | `DT_BX_Weapons` 参照 |
+| `LinkedArmorId` | `FName` |  | `DT_BX_Armors` 参照 |
+| `QuestEventTag` | `FGameplayTag` |  | 依頼イベントタグ |
+
+### CSV サンプル
+
+```csv
+ItemId,DisplayNameJa,DisplayNameEn,ItemCategory,bIsStackable,MaxStackSize,WeightPerUnitKg,BasePriceCredits,PriceVarianceRatio,bCanSellToTrader,bCanStoreAtMerchant,bUsableInRaid,bIsQuestItem,bIsKeyItem
+item_med_bandage,"包帯","Bandage",Medical,true,4,0.2,1200,0.20,true,true,true,false,false
+item_food_water_500,"水 500ml","Water 500ml",Consumable,true,2,0.5,900,0.15,true,true,true,false,false
+item_keycard_wh_a01,"倉庫A01カード","Warehouse A01 Keycard",KeyItem,false,1,0.1,8000,0.00,false,true,false,false,true
+```
+
+### 関連章
+
+* §16-4
+* §23-7
+* §24-1
+* §24-3
+* §31-1
+
+### 受け入れ条件
+
+* [ ] `FBXItemTableRow` が C++ で定義されている
+* [ ] `DT_BX_Items` が `ItemId` 主キーで参照できる
+* [ ] 日英表示名と説明文を保持できる
+* [ ] スタック、重量、価格、使用可否を 1 行で定義できる
+* [ ] 医療、弾薬、鍵、依頼、武器 / 防具リンク列を持てる
+* [ ] CSV から DataTable へインポートできる
+
+
+---
+
+## §24-3 医療アイテム使用仕様
+
+### 概要
+
+本章では、プレイヤーがレイド中に医療アイテムを使用する仕様を定義する。
+本作では `UBXMedicalUseSubsystem` が医療使用の実行ハブとなり、`AC_BX_Inventory`、`AC_BX_StatusEffects`、`AC_BX_HealthBodyParts`、`APlayerCharacterBase` と連携して **止血 / 回復 / 骨折治療 / 鎮痛 / 使用中断** を処理する。
+
+### 仕様
+
+* 医療使用の実行ハブは `UBXMedicalUseSubsystem` とする。
+* プレイヤー入力起点は `IA_BX_MedicalUse` とする。
+* 使用アイテムの正本は `AC_BX_Inventory` にある。
+* 部位 HP 正本は `AC_BX_HealthBodyParts` にある。
+* 出血 / 骨折 / 痛み / 脳震盪などの状態異常正本は `AC_BX_StatusEffects` にある。
+* 医療用途は最低限以下を持つ:
+  * `StopBleed`
+  * `HealBodyPart`
+  * `FixFracture`
+  * `PainRelief`
+  * `MultiMedical`
+* 使用は即時発動ではなく `UseDurationSec` を伴う。
+* 被弾、武器切替、射撃、リロード、スプリント、スライド、強制インタラクトで中断できる。
+* 完了時のみ効果適用と消費を行う。
+* 対象部位指定型アイテムは `Chest` を含む 7 部位選択に対応する。
+
+### 基本フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `OwnerPlayer` | `APlayerCharacterBase*` | ✅ | 使用主体 |
+| `InventoryComponent` | `UAC_BX_Inventory*` | ✅ | 所持品参照 |
+| `StatusEffectsComponent` | `UAC_BX_StatusEffects*` | ✅ | 状態異常参照 |
+| `HealthBodyPartsComponent` | `UAC_BX_HealthBodyParts*` | ✅ | 部位 HP 参照 |
+| `bIsMedicalUseActive` | `bool` | ✅ | 使用中か |
+| `CurrentMedicalItemInstanceId` | `FGuid` |  | 使用中アイテム ID |
+| `CurrentMedicalTargetBodyPart` | `EBXBodyPart` |  | 対象部位 |
+| `MedicalUseElapsedSec` | `float` |  | 経過時間 |
+| `MedicalUseRemainingSec` | `float` |  | 残り時間 |
+| `LastMedicalInterruptReason` | `EBXMedicalInterruptReason` |  | 最終中断理由 |
+
+### 中断理由一覧
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `TookDamage` | `EBXMedicalInterruptReason` | ✅ | 被弾 |
+| `WeaponSwap` | `EBXMedicalInterruptReason` | ✅ | 武器切替 |
+| `StartedFire` | `EBXMedicalInterruptReason` | ✅ | 射撃開始 |
+| `StartedReload` | `EBXMedicalInterruptReason` | ✅ | リロード開始 |
+| `StartedSprint` | `EBXMedicalInterruptReason` | ✅ | スプリント開始 |
+| `StartedSlide` | `EBXMedicalInterruptReason` | ✅ | スライド開始 |
+| `ForcedInteraction` | `EBXMedicalInterruptReason` | ✅ | 強制インタラクト |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+void InitializeMedicalUseSubsystem(APlayerCharacterBase* InOwnerPlayer);
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+bool RequestUseMedicalItem(FGuid ItemInstanceId, EBXBodyPart TargetBodyPart);
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+bool RequestUseMedicalItemByQuickSlot(int32 QuickSlotIndex, EBXBodyPart TargetBodyPart);
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+bool BeginMedicalUse(FGuid ItemInstanceId, FName ItemId, EBXBodyPart TargetBodyPart, float UseDurationSec);
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+void TickMedicalUse(float DeltaSeconds);
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+void InterruptMedicalUse(EBXMedicalInterruptReason InterruptReason);
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+void CompleteMedicalUse();
+
+UFUNCTION(BlueprintCallable, Category="BX|Medical")
+void ApplyMedicalEffects(const FBXItemTableRow& ItemRow, EBXBodyPart TargetBodyPart);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Medical")
+void BP_OnMedicalUseStarted(FName ItemId, EBXBodyPart TargetBodyPart, float DurationSec);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Medical")
+void BP_OnMedicalUseInterrupted(EBXMedicalInterruptReason InterruptReason);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Medical")
+void BP_OnMedicalUseCompleted(FName ItemId, EBXBodyPart TargetBodyPart);
+```
+
+### 関連章
+
+* §23-4
+* §23-6
+* §24-1
+* §24-2
+* §29-5
+
+### 受け入れ条件
+
+* [ ] クイックスロットとインベントリの両方から医療使用できる
+* [ ] 出血 / 骨折 / 欠損 HP / 痛みに応じて使用可否を判定できる
+* [ ] 使用時間を伴う進行型医療ができる
+* [ ] 被弾や武器切替で中断できる
+* [ ] 完了時のみアイテムを消費する
+* [ ] `Chest` を含む 7 部位への回復適用ができる
+* [ ] HUD に使用中アイテム名、対象部位、残り時間を表示できる
+
+---
+
+## §31-1 脱出ポイント基底仕様
+
+### 概要
+
+本章では、レイド離脱の中核となる脱出ポイント基底クラスを定義する。
+既存実装済み `ABXExtractPointBase` を前提とし、進入判定、可否条件、カウントダウン、失敗 / 成功、UI 連携、セーブ連携を仕様として固定する。
+
+### ASCII クラス階層図
+
+```text
+AActor
+└─ ABXExtractPointBase
+   ├─ BP_BX_ExtractPoint_KansaiIndustrial01_SewerTunnel
+   ├─ BP_BX_ExtractPoint_KansaiIndustrial01_BreakwaterGate
+   └─ BP_BX_ExtractPoint_*
+```
+
+### 仕様
+
+* C++ クラス名は `ABXExtractPointBase`、Blueprint 派生は `BP_BX_ExtractPoint_*` 命名。
+* 役割: 進入 / 離脱検出、利用可否判定、必要条件チェック、カウントダウン進行、中断条件処理、成功 / 失敗通知。
+* 脱出条件は鍵、電源、任務、時間帯、重量などをタグと数値で表現できるようにする。
+
+### 基本フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `ExtractPointId` | `FName` | ✅ | 脱出ポイント ID |
+| `RegionId` | `FName` | ✅ | 所属地域 ID |
+| `ExtractType` | `EBXExtractType` | ✅ | Static/Conditional/Timed/KeyRequired/PowerRequired |
+| `DisplayNameJa` | `FText` | ✅ | 日本語表示名 |
+| `DisplayNameEn` | `FText` | ✅ | 英語表示名 |
+| `BaseExtractDurationSec` | `float` | ✅ | 基本脱出時間 |
+| `bEnabledByDefault` | `bool` | ✅ | 初期有効か |
+| `bCanBeUsedMultipleTimes` | `bool` | ✅ | 複数回利用可能か |
+| `bIsExtractionActive` | `bool` | ✅ | 進行中か |
+| `RemainingExtractSeconds` | `float` |  | 残り時間 |
+| `ElapsedExtractSeconds` | `float` |  | 経過時間 |
+
+### 利用可否条件フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `bRequiresKeyItem` | `bool` | ✅ | 鍵必要か |
+| `RequiredKeyItemTag` | `FGameplayTag` |  | 必要キータグ |
+| `bRequiresPower` | `bool` | ✅ | 電源必要か |
+| `RequiredPowerStateTag` | `FGameplayTag` |  | 必要電源タグ |
+| `bRequiresQuestFlag` | `bool` | ✅ | 任務フラグ必要か |
+| `RequiredQuestFlag` | `FGameplayTag` |  | 必要任務フラグ |
+| `bRequiresTimeWindow` | `bool` | ✅ | 時間帯制限あるか |
+| `bRequiresCarryWeightUnderThreshold` | `bool` |  | 重量制限あるか |
+| `RequiredMaxCarryWeightKg` | `float` |  | 許可最大総重量 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void InitializeExtractPoint();
+
+UFUNCTION(BlueprintPure, Category="BX|Extract")
+bool CanPlayerExtract(APlayerCharacterBase* Player, EBXExtractFailReason& OutFailReason) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+bool BeginExtractForPlayer(APlayerCharacterBase* Player);
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void TickExtractProgress(float DeltaSeconds);
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void CompleteExtract();
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void AbortExtract(EBXExtractFailReason FailReason);
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void NotifyPlayerEnteredZone(APlayerCharacterBase* Player);
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void NotifyPlayerExitedZone(APlayerCharacterBase* Player);
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void ExportToExtractionProgressState(FBXExtractionProgressState& OutState) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|Extract")
+void ImportFromExtractionProgressState(const FBXExtractionProgressState& InState);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Extract")
+void BP_OnExtractStarted(APlayerCharacterBase* Player);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Extract")
+void BP_OnExtractAborted(EBXExtractFailReason FailReason);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|Extract")
+void BP_OnExtractCompleted(APlayerCharacterBase* Player);
+```
+
+### 関連章
+
+* §16-4
+* §23-7
+* §29-5
+* §31-2
+* §31-3
+
+### 受け入れ条件
+
+* [ ] `ABXExtractPointBase` を C++ 基底として生成できる
+* [ ] 脱出ゾーン進入 / 離脱を検知できる
+* [ ] 鍵 / 電源 / 任務 / 時間帯 / 重量の条件を評価できる
+* [ ] 条件成立時にカウントダウンを開始できる
+* [ ] 被弾 / 射撃 / ゾーン離脱 / 条件喪失で中断できる
+* [ ] 成功時にレイド結果側へ通知できる
+* [ ] `FBXExtractionProgressState` へ Save / Load できる
+
+---
+
+## §29-3 詳細版 商人ハブホーム画面 UI(ChatGPT 詳細化)
+
+### 概要
+
+本章では、プレイヤーが商人ネットワークへ接続した際に最初に表示される **商人ハブのホーム画面 UI** を定義する。
+本画面は、現在利用可能な商人、所持通貨、預け在庫の概要、信頼度、アクティブ依頼、地域ノード、重要通知を 1 画面で把握し、各商人個別画面や依頼画面へ遷移するための入口となる。
+
+### 仕様
+
+* Widget Blueprint 名は `WBP_BX_MerchantHub` とする。
+* 商人ハブは単一商人画面ではなく、ネットワーク全体の総合トップとする。
+* 開く起点: 商人ノード端末使用、セーフルーム内ネットワーク端末使用、特定の復帰直後メニュー。
+* 本画面で行うこと:
+  * 5商人の状態一覧表示
+  * プレイヤー所持通貨表示
+  * 商人預け在庫の概要表示
+  * 信頼度 / 解放状況表示
+  * 進行中依頼の要約表示
+  * 現在地域・ノード情報表示
+  * 各詳細画面への遷移
+* 本画面で行わないこと: 個別アイテム売買の詳細処理、詳細在庫操作、依頼の全文確認、ノード再配置の詳細編集。
+
+### 画面状態フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `CurrentMerchantHubState` | `EBXMerchantHubState` | ✅ | Home/MerchantDetail/QuestSummary 等 |
+| `CurrentFocusedMerchantId` | `FName` |  | 選択中商人 ID |
+| `CurrentNetworkNodeId` | `FName` |  | アクセス中ノード ID |
+| `bHasUnreadMerchantNotifications` | `bool` | ✅ | 未読通知あり |
+| `bHasQuestUpdates` | `bool` | ✅ | 依頼更新あり |
+| `bMerchantHubInputLocked` | `bool` | ✅ | 入力ロック中 |
+
+### 上部バー用構造体
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `WalletCredits` | `int32` | ✅ | 所持通貨 |
+| `CurrentRegionId` | `FName` | ✅ | 地域 ID |
+| `CurrentRegionNameJa` | `FText` | ✅ | 日本語地域名 |
+| `CurrentRegionNameEn` | `FText` | ✅ | 英語地域名 |
+| `CurrentNodeId` | `FName` | ✅ | ノード ID |
+| `UnreadNoticeCount` | `int32` | ✅ | 未読通知数 |
+| `ActiveQuestCount` | `int32` | ✅ | 進行中依頼数 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void BuildMerchantHubViewData();
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void RefreshMerchantHubViewData();
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void SetFocusedMerchant(FName MerchantId);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void RequestOpenMerchantDetail(FName MerchantId);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void RequestOpenStorageView();
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void RequestOpenQuestSummaryView();
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantUI")
+void RequestCloseMerchantHub();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|MerchantUI")
+void BP_OnMerchantHubDataRefreshed();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|MerchantUI")
+void BP_OnFocusedMerchantChanged(FName MerchantId);
+```
+
+### 関連章
+
+* §16-3
+* §29-4
+* §29-5
+* §32-1
+
+### 受け入れ条件
+
+* [ ] 5商人の一覧を 1 画面で表示できる
+* [ ] 所持通貨、現在地域、現在ノード、通知数を表示できる
+* [ ] 左ナビから各サブ画面へ遷移できる
+* [ ] 商人カード選択で右サマリーが更新される
+* [ ] 日英表示を切り替えられる
+
+---
+
+## §29-4 詳細版 商人個別画面 UI(ChatGPT 詳細化)
+
+### 概要
+
+本章では、商人ハブから遷移する商人個別画面 UI を定義する。
+本画面は、各商人の専門機能を利用するための実務画面であり、売買 / 預け / 引き出し / 修理 / 治療 / 運搬 / 情報購入 / 依頼受注の入口となる。
+
+### 仕様
+
+* 画面ルート Widget 名は `WBP_BX_MerchantDetail` とする。
+* `WBP_BX_MerchantDetail` は共通ベースとし、商人ごとの差分は表示データとタブの有効 / 無効で制御する。
+* 商人ごとの主役割:
+  * `merchant_minato`: 雑貨売買、初期預かり
+  * `merchant_sawabe`: 治療、医療品売買
+  * `merchant_kurogane`: 修理、分解、部品売買
+  * `merchant_yoshinaga`: 地域間移送、リスポーン拡張
+  * `merchant_amagi`: 情報購入、危険度情報
+
+### 商人別有効タブ表
+
+| 商人ID | 有効タブ |
+| --- | --- |
+| `merchant_minato` | Trade, Buy, Sell, Storage, Quests, Back |
+| `merchant_sawabe` | Medical, Buy, Sell, Storage, Quests, Back |
+| `merchant_kurogane` | Repair, Buy, Sell, Storage, Quests, Back |
+| `merchant_yoshinaga` | Transport, Storage, Quests, Back |
+| `merchant_amagi` | Intel, Buy, Quests, Back |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|MerchantDetailUI")
+void BuildMerchantDetailViewData(FName MerchantId);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantDetailUI")
+void RefreshMerchantDetailEntries();
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantDetailUI")
+void SetCurrentMerchantDetailTab(EBXMerchantDetailTab NewTab);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantDetailUI")
+void SetSelectedEntry(FName EntryId);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantDetailUI")
+void RequestExecuteSelectedEntry();
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantDetailUI")
+void RequestBackFromMerchantDetail();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|MerchantDetailUI")
+void BP_OnMerchantDetailDataRefreshed();
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|MerchantDetailUI")
+void BP_OnMerchantDetailTabChanged(EBXMerchantDetailTab NewTab);
+```
+
+### 関連章
+
+* §24-2
+* §29-3
+* §29-5
+* §32-1
+
+### 受け入れ条件
+
+* [ ] 5商人で共通ベースの個別画面を表示できる
+* [ ] 商人ごとに有効タブが切り替わる
+* [ ] 商品 / サービス / 依頼 / 預け在庫の一覧を表示できる
+* [ ] 右詳細に価格、重量、条件を表示できる
+* [ ] 確認ダイアログを表示できる
+* [ ] 日英表示を切り替えられる
+
+---
+
+## §29-5 商人売買フロー仕様
+
+### 概要
+
+本章では、商人個別画面上で実行される購入 / 売却 / 預け / 引き出し / 修理 / 治療 / 移送 / 情報購入 / 依頼納品のフローを定義する。
+UI は Blueprint 主導で構成し、価格計算、可否判定、在庫反映、信頼度反映、セーブ反映は C++ 側を正本とする。
+
+### 仕様
+
+* すべての商人操作は `Request → Validate → Confirm → Execute → Commit / Rollback` の順で処理する。
+* 価格、信頼度、在庫可否、重量可否は Execute 前に再検証する。
+* 成功時のみ反映: 通貨変動、在庫変動、信頼度変動、依頼進行、UI 通知。
+* 失敗時はプレイヤー所持品・商人在庫・通貨を変更しない。
+* すべての操作結果は `EBXMerchantTransactionResult` を返せるようにする。
+
+### トランザクション共通構造体
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `TransactionId` | `FGuid` | ✅ | トランザクション ID |
+| `MerchantId` | `FName` | ✅ | 対象商人 |
+| `TransactionType` | `EBXMerchantTransactionType` | ✅ | Buy/Sell/Store/Withdraw/Repair/Heal/Transport/Intel/QuestSubmit |
+| `PlayerProfileId` | `FGuid` | ✅ | プロフィール ID |
+| `ItemOrEntryId` | `FName` |  | 対象 ID |
+| `Quantity` | `int32` |  | 数量 |
+| `TotalPriceCredits` | `int32` |  | 最終価格 |
+| `TrustDelta` | `int32` |  | 信頼度変動 |
+| `Result` | `EBXMerchantTransactionResult` |  | 実行結果 |
+
+### C++ 関数シグネチャ
+
+```cpp
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+void BeginMerchantTransaction(const FBXMerchantTransactionRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool ValidateMerchantTransaction(const FBXMerchantTransactionRequest& Request, FBXMerchantTransactionValidationResult& OutResult) const;
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+void ExecuteMerchantTransaction(const FBXMerchantTransactionRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+void CommitMerchantTransaction(const FBXMerchantTransactionResultData& ResultData);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+void RollbackMerchantTransaction(const FBXMerchantTransactionRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool TryPurchaseMerchantOffer(const FBXMerchantPurchaseRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool TrySellInventoryItem(const FBXMerchantTransferRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool TryStoreInventoryItem(const FBXMerchantTransferRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool TryWithdrawStoredItem(const FBXMerchantTransferRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool TryExecuteMerchantService(const FBXMerchantServiceRequest& Request);
+
+UFUNCTION(BlueprintCallable, Category="BX|MerchantTransaction")
+bool TryTurnInMerchantQuest(const FBXMerchantQuestTurnInRequest& Request);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|MerchantTransaction")
+void BP_OnMerchantTransactionSucceeded(const FBXMerchantTransactionResultData& ResultData);
+
+UFUNCTION(BlueprintImplementableEvent, Category="BX|MerchantTransaction")
+void BP_OnMerchantTransactionFailed(EBXMerchantTransactionResult FailureReason);
+```
+
+### 関連章
+
+* §24-1
+* §24-2
+* §24-3
+* §29-3
+* §29-4
+
+### 受け入れ条件
+
+* [ ] `Request → Validate → Confirm → Execute → Commit / Rollback` フローで処理できる
+* [ ] 購入 / 売却 / 預け / 引き出しに対応できる
+* [ ] 修理 / 治療 / 移送 / 情報購入に対応できる
+* [ ] 依頼納品と報酬適用に対応できる
+* [ ] 失敗時に正本を書き換えずロールバックできる
+* [ ] 通貨、在庫、信頼度、依頼進行を UI に即時反映できる
+
+
+---
+
+## §31-2 初期地域 `KansaiIndustrial01` の脱出ポイント一覧
+
+### 概要
+
+本章では、初期地域 **近畿湾岸工業圏 第一区画 (`KansaiIndustrial01`)** に配置する脱出ポイントの一覧と個別仕様を定義する。
+本地域は縦切り優先で最初に完成させるため、脱出ポイントも固定脱出 / 条件付き脱出 / 鍵要求脱出 / 電源要求脱出 / 単発脱出を一通り含め、以後の地域展開の雛形とする。
+
+### 仕様
+
+* 初期地域の脱出ポイントは最低 6 箇所とする。
+* 構成内訳:
+  * 常時有効の基本脱出: 2
+  * 条件付き脱出: 2
+  * 鍵 / カード要求脱出: 1
+  * 電源または任務連動脱出: 1
+* すべての脱出ポイントに日英名称を持たせる。
+* 一部脱出のみがプレイヤー開始時から利用可能で、残りは探索や条件達成で開放される。
+
+### 地域脱出ポイントマスタ
+
+| `ExtractPointId` | `DisplayNameJa` | `DisplayNameEn` | `ExtractType` | `BaseExtractDurationSec` | `RiskLevel` | `bEnabledByDefault` | `PrimaryConditionTag` |
+| --- | --- | --- | --- | ---: | --- | --- | --- |
+| `extract_kansai01_sewer_tunnel` | 下水トンネル搬出口 | Sewer Tunnel Exit | `Static` | 7.0 | Low | ✅ |  |
+| `extract_kansai01_breakwater_gate` | 防波堤ゲート | Breakwater Gate | `Static` | 8.5 | Medium | ✅ |  |
+| `extract_kansai01_warehouse_carddoor` | 倉庫A01裏搬出口 | Warehouse A01 Back Exit | `KeyRequired` | 6.0 | Medium |  | `Access.Warehouse.A01` |
+| `extract_kansai01_substation_rail` | 変電所貨物レール | Substation Rail Exit | `PowerRequired` | 10.0 | High |  | `Power.Substation.Online` |
+| `extract_kansai01_smuggler_barge` | 密輸バージ接岸点 | Smuggler Barge Dock | `Conditional` | 12.0 | High |  | `Extract.Barge.WindowOpen` |
+| `extract_kansai01_overpass_ladder` | 高架補修梯子 | Overpass Maintenance Ladder | `Conditional` | 5.5 | Medium | ✅ | `Extract.Overpass.LightLoadOnly` |
+
+### CSV サンプル
+
+```csv
+ExtractPointId,DisplayNameJa,DisplayNameEn,ExtractType,PoiId,RegionId,BaseExtractDurationSec,RiskLevel,bEnabledByDefault,PrimaryConditionTag
+extract_kansai01_sewer_tunnel,"下水トンネル搬出口","Sewer Tunnel Exit",Static,poi_sewer_junction_01,KansaiIndustrial01,7.0,Low,true,
+extract_kansai01_breakwater_gate,"防波堤ゲート","Breakwater Gate",Static,poi_breakwater_01,KansaiIndustrial01,8.5,Medium,true,
+extract_kansai01_warehouse_carddoor,"倉庫A01裏搬出口","Warehouse A01 Back Exit",KeyRequired,poi_warehouse_a01,KansaiIndustrial01,6.0,Medium,false,Access.Warehouse.A01
+extract_kansai01_substation_rail,"変電所貨物レール","Substation Rail Exit",PowerRequired,poi_substation_01,KansaiIndustrial01,10.0,High,false,Power.Substation.Online
+extract_kansai01_smuggler_barge,"密輸バージ接岸点","Smuggler Barge Dock",Conditional,poi_harbor_barge_01,KansaiIndustrial01,12.0,High,false,Extract.Barge.WindowOpen
+extract_kansai01_overpass_ladder,"高架補修梯子","Overpass Maintenance Ladder",Conditional,poi_overpass_01,KansaiIndustrial01,5.5,Medium,true,Extract.Overpass.LightLoadOnly
+```
+
+### 関連章
+
+* §31-1
+* §31-3
+* §31-4
+* §32-1
+
+### 受け入れ条件
+
+* [ ] `KansaiIndustrial01` に最低 6 箇所の脱出ポイントが定義されている
+* [ ] 固定、条件付き、鍵要求、電源要求の各種別を含む
+* [ ] すべての脱出ポイントに日英名称がある
+* [ ] 初期有効脱出と後解放脱出を分けて管理できる
+
+---
+
+## §31-3 `KansaiIndustrial01` POI / スポーン / 導線
+
+### 概要
+
+本章では、初期地域 `KansaiIndustrial01` の基礎地理構造を定義する。
+対象は、主要 POI、プレイヤースポーン、敵出現の基礎分布、主要導線、危険帯、初期縦切り実装に必要な最小レベル構成である。
+
+### 仕様
+
+* 地域 ID は `KansaiIndustrial01` 固定。
+* 「港湾工業エリアの一部区画」を切り出した構成。
+* 初期縦切りでは、スポーン、ルート、戦闘、依頼回収、鍵取得、条件付き脱出が 1 地域内で成立することを目的とする。
+* 地形要素: 倉庫群、中央ヤード、変電所、下水接続部、防波堤、高架補修通路、密輸バージ接岸区画。
+
+### 主要 POI 一覧
+
+| `PoiId` | `DisplayNameJa` | `DisplayNameEn` | 主用途 | 危険度 |
+| --- | --- | --- | --- | --- |
+| `poi_warehouse_a01` | 倉庫A01 | Warehouse A01 | 鍵・ルート・依頼 | High |
+| `poi_central_yard_01` | 中央資材ヤード | Central Material Yard | 中央交戦地帯 | High |
+| `poi_substation_01` | 第一区変電所 | Substation Sector 01 | 電源起動 | High |
+| `poi_sewer_junction_01` | 下水接続区画 | Sewer Junction | 安全寄り導線 | Medium |
+| `poi_breakwater_01` | 防波堤区画 | Breakwater Sector | 脱出・露出地帯 | Medium |
+| `poi_overpass_01` | 高架補修区画 | Overpass Maintenance Zone | 高低差戦闘 | Medium |
+| `poi_harbor_barge_01` | 密輸バージ区画 | Smuggler Barge Sector | 高リスク高報酬 | High |
+| `poi_pump_room_01` | 排水ポンプ室 | Pump Room | 裏導線・依頼補助 | Medium |
+
+### プレイヤースポーン一覧
+
+| `SpawnPointId` | `DisplayNameJa` | `DisplayNameEn` | 対応側 | 近接 POI |
+| --- | --- | --- | --- | --- |
+| `spawn_kansai01_west_service_01` | 西側整備通路 | West Service Passage | 西 | `poi_warehouse_a01` |
+| `spawn_kansai01_drain_edge_01` | 排水路縁 | Drainage Edge | 南西 | `poi_sewer_junction_01` |
+| `spawn_kansai01_breakwater_inlet_01` | 防波堤入口 | Breakwater Inlet | 南 | `poi_breakwater_01` |
+| `spawn_kansai01_substation_back_01` | 変電所裏側 | Substation Rear | 北東 | `poi_substation_01` |
+| `spawn_kansai01_container_lane_01` | コンテナ通路 | Container Lane | 東 | `poi_harbor_barge_01` |
+| `spawn_kansai01_overpass_base_01` | 高架下基部 | Overpass Base | 北 | `poi_overpass_01` |
+| `spawn_kansai01_pump_room_entry_01` | ポンプ室入口 | Pump Room Entry | 中央外周 | `poi_pump_room_01` |
+| `spawn_kansai01_yard_outer_01` | ヤード外周路 | Yard Outer Route | 中央外周 | `poi_central_yard_01` |
+
+### 基本導線一覧
+
+| ルートID | 名称 | 主経路 | 主な用途 | リスク |
+| --- | --- | --- | --- | --- |
+| `route_safe_sewer` | 安全寄り導線 | ポンプ室→下水→下水脱出 | 生還重視 | Low |
+| `route_mid_yard_push` | 中央突破導線 | 倉庫外縁→中央ヤード→防波堤 | 速攻脱出 | High |
+| `route_high_value_barge` | 高価値導線 | コンテナ通路→密輸バージ→沿岸 | 高価値ルート | High |
+| `route_condition_substation` | 条件解除導線 | 変電所→貨物レール脱出 | 電源起動利用 | Medium-High |
+| `route_light_overpass` | 軽装脱出導線 | 高架下→補修梯子 | 軽装高速脱出 | Medium |
+
+### ASCII 導線図
+
+```text
+[West Service]
+      |
+      v
+[Warehouse A01] ---- [Central Yard] ---- [Breakwater Gate]
+      |                    |
+      |                    |
+      v                    v
+ [Pump Room] -------- [Sewer Junction]
+      |
+      |
+      v
+[Substation] ---- [Overpass] ---- [Container Lane] ---- [Smuggler Barge]
+```
+
+### 関連章
+
+* §31-1
+* §31-2
+* §31-4
+* §32-1
+
+### 受け入れ条件
+
+* [ ] 主要 POI が最低 8 箇所定義されている
+* [ ] スポーン候補が最低 8 箇所定義されている
+* [ ] POI ごとに敵密度の高低が定義されている
+* [ ] 安全寄り / 中央突破 / 高価値 / 条件解除導線を持つ
+* [ ] 地域データを DataTable から参照できる
+
+---
+
+## §31-4 `KansaiIndustrial01` ルート / 鍵 / 電源 / 依頼配置
+
+### 概要
+
+本章では、初期地域 `KansaiIndustrial01` に配置するインタラクト対象のうち、ルートコンテナ、鍵 / カード、電源設備、依頼対象オブジェクトの配置と役割を定義する。
+
+### 仕様
+
+* 配置カテゴリは 4 種: ルートコンテナ、鍵 / カード、電源設備、依頼オブジェクト。
+* すべての配置物は `PoiId` と紐づける。
+* 重要オブジェクトは固定候補位置 + 条件付き活性化を基本とする。
+* 鍵 / カードは初期地域で最低 1 本の明確な取得導線を持たせる。
+* 電源設備は変電所 POI と強く結びつける。
+
+### ルートコンテナ種別定義
+
+| フィールド名 | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `ScrapCrate` | `EBXLootContainerType` | ✅ | 雑貨箱 |
+| `MedicalCase` | `EBXLootContainerType` | ✅ | 医療箱 |
+| `AmmoCase` | `EBXLootContainerType` | ✅ | 弾薬箱 |
+| `ToolBox` | `EBXLootContainerType` | ✅ | 工具箱 |
+| `Locker` | `EBXLootContainerType` | ✅ | ロッカー |
+| `ValuableCase` | `EBXLootContainerType` | ✅ | 高価値ケース |
+| `HiddenCache` | `EBXLootContainerType` | ✅ | 隠しキャッシュ |
+
+### ルートコンテナ配置一覧(代表)
+
+| `ObjectPlacementId` | `PoiId` | `ContainerType` | `DisplayNameJa` | `DisplayNameEn` |
+| --- | --- | --- | --- | --- |
+| `loot_kansai01_wa01_scrap_01` | `poi_warehouse_a01` | `ScrapCrate` | 倉庫雑貨箱A | Warehouse Scrap Crate A |
+| `loot_kansai01_wa01_value_01` | `poi_warehouse_a01` | `ValuableCase` | 倉庫高価値ケース | Warehouse Valuable Case |
+| `loot_kansai01_sub_med_01` | `poi_substation_01` | `MedicalCase` | 変電所救急箱 | Substation Medical Case |
+| `loot_kansai01_sub_tool_01` | `poi_substation_01` | `ToolBox` | 変電所工具箱 | Substation Toolbox |
+| `loot_kansai01_sewer_hidden_01` | `poi_sewer_junction_01` | `HiddenCache` | 下水隠しキャッシュ | Sewer Hidden Cache |
+| `loot_kansai01_barge_value_01` | `poi_harbor_barge_01` | `ValuableCase` | バージ密輸ケース | Barge Smuggling Case |
+
+### 鍵 / カード一覧
+
+| `ItemId` | `DisplayNameJa` | `DisplayNameEn` | 主用途 |
+| --- | --- | --- | --- |
+| `item_keycard_wh_a01` | 倉庫A01カード | Warehouse A01 Keycard | 倉庫裏搬出口 / 倉庫進入 |
+| `item_key_substation_service` | 変電所保守鍵 | Substation Service Key | 変電所内部アクセス |
+
+### 鍵配置マスタ
+
+| `ObjectPlacementId` | `ItemId` | `PoiId` | `SpawnMode` | `bEnabledByDefault` |
+| --- | --- | --- | --- | --- |
+| `keyspawn_kansai01_wh_a01_01` | `item_keycard_wh_a01` | `poi_pump_room_01` | `CandidateRandom` | ✅ |
+| `keyspawn_kansai01_wh_a01_02` | `item_keycard_wh_a01` | `poi_warehouse_a01` | `HighValueContainer` | ✅ |
+| `keyspawn_kansai01_subsvc_01` | `item_key_substation_service` | `poi_substation_01` | `FixedDesk` | ✅ |
+| `keyspawn_kansai01_subsvc_02` | `item_key_substation_service` | `poi_central_yard_01` | `EnemyCarrier` | ✅ |
+
+### 電源設備一覧
+
+| `ObjectPlacementId` | `PowerDeviceId` | `PoiId` | `DisplayNameJa` | 主効果 |
+| --- | --- | --- | --- | --- |
+| `powerobj_kansai01_substation_main_01` | `power_kansai01_substation_main` | `poi_substation_01` | 主変電盤 | レール脱出有効化 |
+| `powerobj_kansai01_substation_aux_01` | `power_kansai01_substation_aux` | `poi_substation_01` | 補助切替盤 | 補助照明 / 一部ドア |
+
+### 依頼オブジェクト一覧(代表)
+
+| `ObjectPlacementId` | `QuestObjectId` | `QuestId` | `PoiId` | `DisplayNameJa` | 種別 |
+| --- | --- | --- | --- | --- | --- |
+| `questobj_kansai01_manifest_01` | `questobj_manifest_a01` | `quest_recover_manifest_01` | `poi_warehouse_a01` | 搬入記録票 | 回収 |
+| `questobj_kansai01_logbook_01` | `questobj_substation_logbook` | `quest_substation_logs_01` | `poi_substation_01` | 点検記録簿 | 調査 |
+| `questobj_kansai01_transponder_01` | `questobj_barge_transponder` | `quest_barge_signal_01` | `poi_harbor_barge_01` | バージ識別機 | 使用 / 回収 |
+
+### POI 別配置密度表
+
+| `PoiId` | 一般ルート密度 | 高価値密度 | 鍵 / 条件密度 | 依頼密度 |
+| --- | ---: | ---: | ---: | ---: |
+| `poi_warehouse_a01` | 0.70 | 0.85 | 0.45 | 0.75 |
+| `poi_central_yard_01` | 0.55 | 0.35 | 0.20 | 0.30 |
+| `poi_substation_01` | 0.50 | 0.40 | 0.80 | 0.55 |
+| `poi_sewer_junction_01` | 0.35 | 0.15 | 0.10 | 0.20 |
+| `poi_breakwater_01` | 0.20 | 0.10 | 0.05 | 0.10 |
+| `poi_overpass_01` | 0.25 | 0.12 | 0.15 | 0.18 |
+| `poi_harbor_barge_01` | 0.45 | 0.95 | 0.25 | 0.40 |
+| `poi_pump_room_01` | 0.48 | 0.18 | 0.35 | 0.32 |
+
+### 関連章
+
+* §23-7
+* §24-2
+* §29-5
+* §31-2
+* §31-3
+
+### 受け入れ条件
+
+* [ ] ルートコンテナ、鍵 / カード、電源、依頼オブジェクトの 4 種を定義できる
+* [ ] すべての配置物が `PoiId` と紐づいている
+* [ ] 倉庫A01カードなど条件解除用アイテムを配置できる
+* [ ] 電源起動で脱出条件タグを有効化できる
+* [ ] 依頼対象オブジェクトが Quest 進行イベントを送れる
+* [ ] POI 別配置密度をデータで参照できる
+
+
