@@ -150,10 +150,241 @@ Q-05: レイド中断セーブの発動条件（モード別可否）が未定
 
 ---
 
-## 最終 git status
+## 最終 git status (Sprint 1〜5)
 
 ```
 On branch main
 nothing to commit, working tree clean
 （.claude/ は .gitignore 対象外の未追跡フォルダのみ）
 ```
+
+---
+
+---
+
+# 追記: Sprints 6〜10 実行レポート — 2026-04-26 (自律セッション継続)
+
+> Sprint 1〜5 完了後の自律セッションにて Sprint 6〜10 を実行。ユーザー不在約 8〜10 時間。
+
+## 全体サマリー (Sprint 6〜10)
+
+| Sprint | SPEC 章 | 対象 | ステータス | コミット |
+|--------|---------|------|-----------|---------|
+| 6 | §15-3 | 医療アイテム詳細 | ✅ 完了 | `61bb4d6` |
+| 7 | §21-1 | 商人 DT / Trust 解放 | ✅ 完了 | `96a3dc3` |
+| 8 | §21-2 | 依頼 DT / 進行構造 | ✅ 完了 | `66fc7ce` |
+| 9 | §18-2/§18-3 | 抽出条件 DT / ポイント基底 | ✅ 完了 | `70c1f08` |
+| 10 | §29-3/§29-4 | 商人ハブ ViewModel | ✅ 完了 | `da8424c` |
+
+全スプリント **ビルドエラー 0** (修正後) で完了。`main` 常時ビルド可能状態を維持。
+
+---
+
+## Sprint 6 — §15-3 医療アイテム詳細
+
+**ブランチ**: `feature/sprint-6-medical` → main
+
+### 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Data/Medical/FBXMedicalItemRow.h` | 医療アイテム DT 行構造体 (26フィールド) |
+| `Source/BX/Public/Systems/Medical/BXMedicalUseSubsystem.h` | 使用タイマー / クールダウン Subsystem 宣言 |
+| `Source/BX/Private/Systems/Medical/BXMedicalUseSubsystem.cpp` | 状態治療ロジック実装 |
+| `DataSource/medical.csv` | 8行 (包帯/止血帯/副木/鎮痛剤/外傷キット/N-15/水/手術キット) |
+
+### 変更ファイル
+
+- `Source/BX/Public/Data/BXEnums.h` — `EBXMedicalType` 追加 (8値)
+- `Config/Tags/BXGameplayTags.ini` — `Item.Medical.*` / `Item.Food.*` / `Item.Key.*` タグ追加
+
+### ビルドエラーと修正
+
+- `error C2039: 'IsValid': TObjectPtr<T> のメンバーではない`
+  - 原因: `TObjectPtr<T>` はメンバー `.IsValid()` を持たない
+  - 修正: `CurrentStatusComp.IsValid()` → グローバル `IsValid(CurrentStatusComp)`
+
+---
+
+## Sprint 7 — §21-1 商人 DT / Trust 解放
+
+**ブランチ**: `feature/sprint-7-merchant` → main
+
+### 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Data/Merchants/FBXMerchantTableRow.h` | 商人マスタ行 (20フィールド、TSoftClassPtr<UUserWidget> 含む) |
+| `Source/BX/Public/Data/Merchants/FBXMerchantTrustRewardRow.h` | Trust 解放報酬行 (12フィールド) |
+| `Source/BX/Public/Systems/Merchant/BXMerchantNetworkSubsystem.h` | Trust 累積/閾値判定 Subsystem 宣言 |
+| `Source/BX/Private/Systems/Merchant/BXMerchantNetworkSubsystem.cpp` | 報酬解放ロジック実装 |
+| `DataSource/merchants.csv` | 5商人 (minato/sawabe/kurogane/yoshinaga/amagi) |
+| `DataSource/merchant_trust_rewards.csv` | Trust 解放報酬 5行 |
+
+### 変更ファイル
+
+- `Source/BX/BX.Build.cs` — `"UMG"` モジュール追加 (`TSoftClassPtr<UUserWidget>` 対応)
+
+---
+
+## Sprint 8 — §21-2 依頼 DT / 進行構造
+
+**ブランチ**: `feature/sprint-8-quests` → main
+
+### 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Data/Quests/FBXQuestTableRow.h` | `FBXQuestRuntimeProgress` + `FBXQuestTableRow` (25フィールド) |
+| `Source/BX/Public/Systems/Quest/BXQuestSubsystem.h` | 依頼管理 Subsystem 宣言 |
+| `Source/BX/Private/Systems/Quest/BXQuestSubsystem.cpp` | 受注/進捗/完了/失敗/報酬配布ロジック |
+| `DataSource/quests.csv` | 12行 (全5商人、8依頼タイプをカバー) |
+
+### 変更ファイル
+
+- `Config/Tags/BXGameplayTags.ini` — `Quest.Fail.*` タグ追加
+
+---
+
+## Sprint 9 — §18-2/§18-3 抽出条件 DT / 抽出ポイント基底
+
+**ブランチ**: `feature/sprint-9-extracts` → main
+
+### 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Data/Extract/FBXExtractRuleRow.h` | 抽出ルール行 (29フィールド、全条件フラグ含む) |
+| `Source/BX/Public/World/Extract/AC_BX_ExtractEvaluator.h` | `FBXExtractEvalResult` + 条件評価コンポーネント宣言 |
+| `Source/BX/Private/World/Extract/AC_BX_ExtractEvaluator.cpp` | 8条件チェック / タグ付き失敗理由 |
+| `Source/BX/Public/World/Extract/ABXExtractPointBase.h` | 抽出ポイント基底 Actor 宣言 (Abstract, Blueprintable) |
+| `Source/BX/Private/World/Extract/ABXExtractPointBase.cpp` | UBoxComponent トリガー / カウントダウンタイマー / キャンセル条件 |
+| `DataSource/extracts.csv` | 6行 (east_checkpoint / west_checkpoint / port_hidden / roof_cable / courier_pickup / vehicle_exit) |
+
+### 変更ファイル
+
+- `Config/Tags/BXGameplayTags.ini` — `Extract.Cancel.*` / `Extract.Fail.*` タグ追加
+
+### Blueprint 作業手順 (ユーザー対応)
+
+```
+## BP 作業手順: BP_BX_ExtractPoint_XXX
+
+1. UE5 エディタで /Content/BX/World/ へ移動
+2. 右クリック → Blueprint Class → 親クラス検索で "BXExtractPointBase" を選択
+3. 名前を BP_BX_ExtractPoint_EastCheckpoint 等に設定
+4. BP を開き以下を設定:
+   - ExtractEvaluator → ExtractRuleDataTable = DT_Extract_KansaiIndustrial01
+   - TriggerVolume (Box) CollisionPreset を Overlap All に設定
+   - プレイヤー Actor の ActorTag に "Player" を追加 (Character BP で設定)
+5. BP_OnExtractionStarted / Completed / Cancelled をオーバーライドして演出実装
+6. Level に配置 → ExtractId を extracts.csv の Name 列と一致させる
+```
+
+---
+
+## Sprint 10 — §29-3/§29-4 商人ハブ ViewModel
+
+**ブランチ**: `feature/sprint-10-merchant-hub` → main
+
+### 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/UI/MerchantHub/FBXMerchantHubViewModels.h` | `FBXMerchantHubMerchantRowViewModel` + `FBXMerchantHubHomeViewModel` |
+| `Source/BX/Public/UI/MerchantHub/FBXMerchantTradeViewModels.h` | `FBXMerchantTradeRowViewModel` + `FBXMerchantTradeSessionViewModel` |
+| `Source/BX/Public/UI/MerchantHub/BXMerchantHubSubsystem.h` | ホーム画面状態集約 Subsystem 宣言 |
+| `Source/BX/Private/UI/MerchantHub/BXMerchantHubSubsystem.cpp` | `BuildHomeViewModel` / `BuildMerchantList` 実装 |
+| `Source/BX/Public/UI/MerchantHub/BXMerchantTradeSubsystem.h` | 取引セッション管理 Subsystem 宣言 |
+| `Source/BX/Private/UI/MerchantHub/BXMerchantTradeSubsystem.cpp` | 価格算出 / CommitBuy / CommitSell / 行 VM 構築 |
+
+### ビルドエラーと修正
+
+- `error C2039: 'InitializeSubsystem': 'FSubsystemCollectionBase' のメンバーではない`
+  - 原因: テンプレート `InitializeSubsystem<T>()` は `TSubsystemCollection<T>` にのみ存在し、`FSubsystemCollectionBase` には公開されていない
+  - 修正: `Initialize` 内の `Collection.InitializeSubsystem<T>()` 呼び出しを削除
+
+### Blueprint 作業手順 (ユーザー対応)
+
+```
+## BP 作業手順: WBP_BX_MerchantHub (ホーム画面)
+
+1. /Content/BX/UI/ に WBP_BX_MerchantHub を作成 (UserWidget)
+2. Event Graph で GameInstance から UBXMerchantHubSubsystem を取得
+3. SelectMerchant(MerchantId) で選択商人を設定
+4. BuildHomeViewModel() → 各フィールドを Text / Image バインド
+5. BuildMerchantList() → ListView/TileView の ItemClass に渡す
+
+## BP 作業手順: WBP_BX_MerchantTrade (取引画面)
+
+1. /Content/BX/UI/ に WBP_BX_MerchantTrade を作成
+2. OnOpen で BeginTradeSession(MerchantId, PlayerCredits) を呼ぶ
+3. SetCurrentTab / SelectItem / SetQuantity を各 UI 操作に接続
+4. CommitBuy / CommitSell をボタンの OnClicked に接続
+5. GetSessionViewModel() で ProjectedCreditsAfterTrade を変更時に更新
+```
+
+---
+
+## 技術メモ (Sprint 6〜10 で発見した注意点)
+
+### TObjectPtr に関する注意点
+
+`TObjectPtr<T>` はメンバー `.IsValid()` を持たない。グローバル関数 `IsValid(Ptr)` を使うこと。`TWeakObjectPtr<T>` のみメンバー `.IsValid()` を持つ。
+
+### FSubsystemCollectionBase::InitializeSubsystem テンプレート版
+
+テンプレート版 `InitializeSubsystem<T>()` は `TSubsystemCollection<T>` にのみ存在し、`Initialize(FSubsystemCollectionBase&)` の引数型では直接呼べない。依存関係の明示が必要なら `ShouldCreateSubsystem()` をオーバーライドして制御する。通常は不要。
+
+### DataTable CSV フォーマット (UE5 5.4 確認済み)
+
+| 型 | CSV 記法 |
+|----|---------|
+| `FGameplayTag` | `(TagName="Status.Bleed.Normal")` |
+| `FGameplayTagContainer` | `(GameplayTags=((TagName="x"),(TagName="y")))` |
+| `TArray<FName>` | `"(id1,id2)"` |
+| `FName` | ベアな文字列 |
+| `TSoftObjectPtr<T>` | `/Game/BX/...` 形式のパス |
+
+---
+
+## 残件・ユーザー対応事項 (Sprint 6〜10)
+
+### DT 作成 (UE5 エディタ操作)
+
+Sprint 6〜9 で新規 DataTable 行構造体を追加したため、以下の DT 作成が必要です:
+
+| DT 名 | Row Structure | CSV |
+|-------|--------------|-----|
+| `DT_BX_Medical` | `FBXMedicalItemRow` | `DataSource/medical.csv` |
+| `DT_BX_Merchants` | `FBXMerchantTableRow` | `DataSource/merchants.csv` |
+| `DT_BX_MerchantTrustRewards` | `FBXMerchantTrustRewardRow` | `DataSource/merchant_trust_rewards.csv` |
+| `DT_BX_Quests` | `FBXQuestTableRow` | `DataSource/quests.csv` |
+| `DT_Extract_KansaiIndustrial01` | `FBXExtractRuleRow` | `DataSource/extracts.csv` |
+
+各 DT の作成場所:
+- Medical / Merchants / Quests → `/Content/BX/Data/Common/`
+- Extract → `/Content/BX/Data/Regions/KansaiIndustrial01/`
+
+### Subsystem DataTable 参照の設定
+
+`UBXMerchantNetworkSubsystem`, `UBXQuestSubsystem`, `UBXMedicalUseSubsystem`, `UAC_BX_ExtractEvaluator` の各 DataTable プロパティは BP または GameInstance で設定が必要です。
+
+---
+
+## 最終 git log (Sprint 6〜10 分)
+
+```
+a92896b merge: Sprint 10 — §29-3/§29-4 商人ハブ ViewModel
+da8424c feat(BX): §29-3/§29-4 商人ハブ ViewModel を実装 (Sprint 10)
+3d461b3 Merge feature/sprint-9-extracts: §18-2/§18-3 抽出ポイント基底 (Sprint 9)
+70c1f08 feat(BX): §18-2/§18-3 抽出条件 DT / 抽出ポイント基底を実装 (Sprint 9)
+345d0de Merge feature/sprint-8-quests: §21-2 依頼 DT / 進行構造 (Sprint 8)
+66fc7ce feat(BX): §21-2 依頼 DT / 進行構造を実装 (Sprint 8)
+84c0c96 Merge feature/sprint-7-merchant: §21-1 商人 DT / Trust 解放構造 (Sprint 7)
+96a3dc3 feat(BX): §21-1 商人 DT / Trust 解放構造を実装 (Sprint 7)
+490d290 Merge feature/sprint-6-medical: §15-3 医療アイテム詳細システム (Sprint 6)
+61bb4d6 feat(BX): §15-3 医療アイテム詳細システム実装 (Sprint 6)
+```
+
+_Sprint 6〜10 自律セッション終了: 2026-04-26_
