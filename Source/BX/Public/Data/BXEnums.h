@@ -217,3 +217,70 @@ enum class EBXRespawnNodeType : uint8
     Warehouse   UMETA(DisplayName = "倉庫"),
     Underground UMETA(DisplayName = "地下避難室"),
 };
+
+// 視点モード (SPEC §23-4)
+UENUM(BlueprintType)
+enum class EBXViewMode : uint8
+{
+    First UMETA(DisplayName = "First Person"),
+    Third UMETA(DisplayName = "Third Person"),
+};
+
+// 移動状態 (SPEC §23-4)
+UENUM(BlueprintType)
+enum class EBXLocomotionState : uint8
+{
+    Idle   UMETA(DisplayName = "Idle"),
+    Walk   UMETA(DisplayName = "Walk"),
+    Run    UMETA(DisplayName = "Run"),
+    Sprint UMETA(DisplayName = "Sprint"),
+    Crouch UMETA(DisplayName = "Crouch"),
+    Prone  UMETA(DisplayName = "Prone"),
+};
+
+// リーン状態 (SPEC §23-4)
+UENUM(BlueprintType)
+enum class EBXLeanState : uint8
+{
+    None  UMETA(DisplayName = "None"),
+    Left  UMETA(DisplayName = "Left"),
+    Right UMETA(DisplayName = "Right"),
+};
+
+// 戦闘状態 (SPEC §23-4)
+UENUM(BlueprintType)
+enum class EBXCombatState : uint8
+{
+    None      UMETA(DisplayName = "None"),
+    Aiming    UMETA(DisplayName = "Aiming"),
+    Firing    UMETA(DisplayName = "Firing"),
+    Reloading UMETA(DisplayName = "Reloading"),
+    Switching UMETA(DisplayName = "Switching"),
+};
+
+// 武器スロット (SPEC §23-4 / §16-4)
+UENUM(BlueprintType)
+enum class EBXWeaponSlot : uint8
+{
+    Primary   UMETA(DisplayName = "Primary"),
+    Secondary UMETA(DisplayName = "Secondary"),
+    Pistol    UMETA(DisplayName = "Pistol"),
+    Melee     UMETA(DisplayName = "Melee"),
+};
+
+// 重量状態 (SPEC §23-4)
+UENUM(BlueprintType)
+enum class EBXCarryState : uint8
+{
+    Normal     UMETA(DisplayName = "Normal"),
+    Heavy      UMETA(DisplayName = "Heavy"),
+    Overweight UMETA(DisplayName = "Overweight"),
+};
+
+// 表示言語 (SPEC §23-4)
+UENUM(BlueprintType)
+enum class EBXLanguage : uint8
+{
+    Japanese UMETA(DisplayName = "Japanese"),
+    English  UMETA(DisplayName = "English"),
+};
