@@ -71,3 +71,7 @@ node_modules/
 # Claude Code internal files
 .claude/
 
+
+docs/TEMP_*.md
+
+docs/SPEC_PartB_backup_*.md
