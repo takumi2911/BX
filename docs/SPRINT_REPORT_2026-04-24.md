@@ -467,3 +467,122 @@ _Sprint 6〜10 自律セッション終了: 2026-04-26_
       IMC_BX_Default に WASD (Move) / Mouse XY (Look) を登録
 5. PIE で WASD 歩行・マウス視点が動くことを確認
 ```
+
+---
+
+---
+
+# Sprint 12 実行結果 — 2026-04-26
+
+**スコープ**: §23-4 `APlayerCharacterBase` — 全 Input_* ハンドラ実装 / `BindAllInputActions` / `SetupPlayerInputComponent`
+
+## 結果
+
+✅ **C++ 実装済み (Sprint 11 先行実装)**
+
+Sprint 12 で実装予定だったすべての関数は、Sprint 11 の `APlayerCharacterBase.cpp` に含まれています。追加コード・コミットは不要です。
+
+## 実装済み関数一覧 (Sprint 11 コミット `f9ba803`)
+
+| 関数 | 実装内容 |
+|------|---------|
+| `SetupPlayerInputComponent` | `UEnhancedInputComponent` キャスト → `BindAllInputActions` 呼び出し |
+| `BindAllInputActions` | 全 24 IA バインド (WeaponSlot は extra-arg テンプレート使用) |
+| `Input_MoveTriggered` | `AddMovementInput` X/Y / bInputLocked チェック / Idle→Walk 遷移 |
+| `Input_LookTriggered` | `AddControllerYawInput` / `AddControllerPitchInput` |
+| `Input_JumpTriggered` | `Jump()` / bInputLocked チェック |
+| `Input_SprintStarted` | `MaxWalkSpeed = 600.0f` / Sprint 状態遷移 |
+| `Input_SprintCompleted` | `MaxWalkSpeed = 400.0f` / Run 状態遷移 |
+| `Input_CrouchToggled` | `Crouch()` / `UnCrouch()` トグル / 状態遷移 |
+| `Input_ProneToggled` | Prone トグル / 状態遷移 |
+| `Input_LeanLeftStarted/Completed` | `EBXLeanState::Left` セット / クリア |
+| `Input_LeanRightStarted/Completed` | `EBXLeanState::Right` セット / クリア |
+| `Input_FirePrimaryStarted/Completed` | `CombatState::Firing` セット / クリア |
+| `Input_FireSecondaryTriggered` | ADS トグル (`CombatState::Aiming`) |
+| `Input_ReloadTriggered` | `CombatState::Reloading` セット (TODO Sprint 14) |
+| `Input_SwitchWeaponSlot(EBXWeaponSlot)` | `CombatState::Switching` / スロット LOG (TODO Sprint 14) |
+| `Input_HolsterTriggered` | LOG のみ (TODO Sprint 14) |
+| `Input_InteractTriggered` | `bIsInteractionActive = true` / LOG (TODO Sprint 13) |
+| `Input_MedicalUseTriggered` | `bIsMedicalUseActive = true` / LOG |
+| `Input_QuickSlotTriggered(int32)` | スロットインデックス LOG |
+| `Input_OpenInventoryTriggered` | LOG のみ (TODO UI Subsystem) |
+| `Input_OpenMapTriggered` | LOG のみ (TODO UI Subsystem) |
+
+## ユーザー対応事項 (Blueprint / PIE 動作確認)
+
+Sprint 12 の目標は「PIE で実際にプレイヤーが動く」状態の確認。以下の BP/エディタ作業が必要です。
+
+```
+## BP 作業手順: IA アセット一式作成
+
+【ステップ 1: Input Action アセット作成】
+/Content/BX/Core/Input/ を開き、以下を右クリック → Input → Input Action で作成:
+
+| アセット名            | Value Type |
+|----------------------|-----------|
+| IA_BX_Move           | Vector 2D |
+| IA_BX_Look           | Vector 2D |
+| IA_BX_Jump           | Boolean   |
+| IA_BX_Sprint         | Boolean   |
+| IA_BX_Crouch         | Boolean   |
+| IA_BX_Prone          | Boolean   |
+| IA_BX_LeanLeft       | Boolean   |
+| IA_BX_LeanRight      | Boolean   |
+| IA_BX_FirePrimary    | Boolean   |
+| IA_BX_FireSecondary  | Boolean   |
+| IA_BX_Reload         | Boolean   |
+| IA_BX_SwitchWeaponPrimary   | Boolean |
+| IA_BX_SwitchWeaponSecondary | Boolean |
+| IA_BX_SwitchWeaponPistol    | Boolean |
+| IA_BX_SwitchWeaponMelee     | Boolean |
+| IA_BX_Holster        | Boolean   |
+| IA_BX_Interact       | Boolean   |
+| IA_BX_MedicalUse     | Boolean   |
+| IA_BX_QuickSlot1     | Boolean   |
+| IA_BX_QuickSlot2     | Boolean   |
+| IA_BX_QuickSlot3     | Boolean   |
+| IA_BX_QuickSlot4     | Boolean   |
+| IA_BX_OpenInventory  | Boolean   |
+| IA_BX_OpenMap        | Boolean   |
+
+【ステップ 2: IMC_BX_Default 作成とキーマッピング】
+同フォルダ → Input → Input Mapping Context → IMC_BX_Default
+
+最低限のマッピング (PIE 動作確認用):
+- IA_BX_Move: W(Y+1), S(Y-1), A(X-1), D(X+1)  ← Swizzle Input Axis Values (XY) Modifier 推奨
+- IA_BX_Look: Mouse XY (Mouse 2D)
+- IA_BX_Jump: Space Bar
+- IA_BX_Sprint: Left Shift
+- IA_BX_Crouch: C
+- IA_BX_FirePrimary: Left Mouse Button
+- IA_BX_FireSecondary: Right Mouse Button
+- IA_BX_Reload: R
+- IA_BX_Interact: E
+- IA_BX_OpenInventory: Tab
+
+【ステップ 3: BP_BX_Player への IA アサインと IMC 設定】
+1. BP_BX_Player を開く
+2. Class Defaults → BX|Input カテゴリに全 IA_BX_* をアサイン
+3. Event Graph → Event BeginPlay → Get Player Controller →
+   Get Subsystem (class: Enhanced Input Local Player Subsystem) →
+   Add Mapping Context (IMC_BX_Default, Priority 0)
+4. Save All
+
+【ステップ 4: PIE テスト】
+1. Project Settings → Maps & Modes → Default Pawn: BP_BX_Player
+2. PIE 起動
+3. 確認項目:
+   - WASD で移動 (OutputLog に Input_MoveTriggered が出ないが動く)
+   - マウスで視点回転
+   - Space でジャンプ
+   - Shift 押下中 MaxWalkSpeed 600 → 放すと 400 に戻る (OutputLog 確認)
+   - C でしゃがみトグル
+   - F キーを Holster に割り当てていれば OutputLog に "Input_HolsterTriggered" 出力
+```
+
+## 技術メモ
+
+- `IA_BX_Move` は Vector2D 型 → `FInputActionValue::Get<FVector2D>()` で取得
+- `IA_BX_Look` も Vector2D 型 → `AddControllerYawInput(X)` / `AddControllerPitchInput(Y)`
+- `IMC` で Mouse XY をそのまま `IA_BX_Look` に繋ぐと Y 軸の感度が逆になる場合は `Negate` Modifier を追加する
+- Sprint → Run 遷移: Sprint キー Released 時に `MaxWalkSpeed` を戻すため `ETriggerEvent::Completed` を使用
