@@ -68,9 +68,17 @@ void APlayerCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+    UE_LOG(LogTemp, Warning, TEXT("APlayerCharacterBase::SetupPlayerInputComponent CALLED — %s"), *GetName());
+
     if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
     {
+        UE_LOG(LogTemp, Warning, TEXT("EnhancedInputComponent cast OK"));
         BindAllInputActions(EIC);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("EnhancedInputComponent cast FAILED — PlayerInputComponent is %s"),
+            PlayerInputComponent ? *PlayerInputComponent->GetClass()->GetName() : TEXT("NULL"));
     }
 }
 
@@ -89,23 +97,58 @@ void APlayerCharacterBase::BindAllInputActions(UEnhancedInputComponent* EIC)
 {
     if (!IsValid(EIC)) { return; }
 
+    UE_LOG(LogTemp, Warning, TEXT("APlayerCharacterBase::BindAllInputActions CALLED — %s"), *GetName());
+
     if (IsValid(IA_BX_Move))
+    {
         EIC->BindAction(IA_BX_Move, ETriggerEvent::Triggered, this, &APlayerCharacterBase::Input_MoveTriggered);
+        UE_LOG(LogTemp, Warning, TEXT("IA_BX_Move BindAction OK"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("IA_BX_Move is NULL — BP_BX_Player の Class Defaults → BX|Input カテゴリで IA_BX_Move をアサインしてください"));
+    }
 
     if (IsValid(IA_BX_Look))
+    {
         EIC->BindAction(IA_BX_Look, ETriggerEvent::Triggered, this, &APlayerCharacterBase::Input_LookTriggered);
+        UE_LOG(LogTemp, Warning, TEXT("IA_BX_Look BindAction OK"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("IA_BX_Look is NULL — BP_BX_Player Class Defaults を確認してください"));
+    }
 
     if (IsValid(IA_BX_Jump))
+    {
         EIC->BindAction(IA_BX_Jump, ETriggerEvent::Triggered, this, &APlayerCharacterBase::Input_JumpTriggered);
+        UE_LOG(LogTemp, Warning, TEXT("IA_BX_Jump BindAction OK"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("IA_BX_Jump is NULL"));
+    }
 
     if (IsValid(IA_BX_Sprint))
     {
         EIC->BindAction(IA_BX_Sprint, ETriggerEvent::Started,   this, &APlayerCharacterBase::Input_SprintStarted);
         EIC->BindAction(IA_BX_Sprint, ETriggerEvent::Completed, this, &APlayerCharacterBase::Input_SprintCompleted);
+        UE_LOG(LogTemp, Warning, TEXT("IA_BX_Sprint BindAction OK"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("IA_BX_Sprint is NULL"));
     }
 
     if (IsValid(IA_BX_Crouch))
+    {
         EIC->BindAction(IA_BX_Crouch, ETriggerEvent::Triggered, this, &APlayerCharacterBase::Input_CrouchToggled);
+        UE_LOG(LogTemp, Warning, TEXT("IA_BX_Crouch BindAction OK"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("IA_BX_Crouch is NULL"));
+    }
 
     if (IsValid(IA_BX_Prone))
         EIC->BindAction(IA_BX_Prone, ETriggerEvent::Triggered, this, &APlayerCharacterBase::Input_ProneToggled);
@@ -237,6 +280,8 @@ void APlayerCharacterBase::ImportPlayerSaveState(const FBXPlayerSaveState& InSta
 
 void APlayerCharacterBase::Input_MoveTriggered(const FInputActionValue& Value)
 {
+    UE_LOG(LogTemp, Warning, TEXT("Input_MoveTriggered CALLED"));
+
     if (bInputLocked) { return; }
     const FVector2D MoveVec = Value.Get<FVector2D>();
     AddMovementInput(GetActorForwardVector(), MoveVec.Y);
