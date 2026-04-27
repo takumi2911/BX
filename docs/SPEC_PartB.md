@@ -3409,3 +3409,429 @@ extract_kansai01_overpass_ladder,"高架補修梯子","Overpass Maintenance Ladd
 * [ ] POI 別配置密度をデータで参照できる
 
 
+
+---
+
+# §22 ドローンシステム
+
+> 以下の §22-1 〜 §22-5 は ChatGPT v3 仕様書から統合した新規章。
+> 統合日: 2026-04-28
+> プレイヤー運用前提のドローンシステム(地上 2 種 + 空中 2 種 = 計 4 種類)。
+
+## §22-1 偵察ドローン種別追加（プレイヤー運用前提）
+
+### 概要
+BX に、プレイヤーがレイド中に運用できる小型偵察ドローンを追加する。  
+本章では **地上ドローン 2 種** と **空中ドローン 2 種** の合計 **4種類** を定義し、主用途を **偵察・索敵・ルート確認・危険確認** とする。  
+敵勢力による運用は完全禁止ではないが、**演出用または限定イベント用に留め、基本運用者は主人公のみ** とする。
+
+### 仕様
+- 本章で追加するドローンは、直接戦闘火力ではなく **偵察・視認・索敵補助** を主目的とする。
+- ドローンの基本運用者は **プレイヤー** とする。
+- 敵勢力による使用は以下に限定する。
+  - 特定ストーリーイベント
+  - 一部の高難度固定ロケーション演出
+  - ボス級エリアの限定ギミック
+- 通常の雑魚敵、巡回敵、一般勢力は基本的にドローンを常用しない。
+- 実装対象のドローンは以下の **4種類** とする。
+  - `Drone.Ground.Light`
+  - `Drone.Ground.Heavy`
+  - `Drone.Air.Light`
+  - `Drone.Air.Heavy`
+- 軽量型は **スピード・取り回し・偵察向き** とする。
+- 重量型は **安定性・稼働時間・被弾耐性・索敵持続** を重視する。
+- 地上ドローンは段差・障害物・床面ルートを利用する。
+- 空中ドローンは天井高、通路幅、障害物密度の影響を受ける。
+- ドローンは武器ではなく、装備スロット上は **特殊ガジェット** 扱いとする。
+- ドローン展開中、プレイヤー本体は無防備になりやすいため、完全な安全装置にはしない。
+- ドローン視点中は以下のいずれかで運用可能とする。
+  - プレイヤーその場停止 + ドローン遠隔視点
+  - プレイヤー簡易自動しゃがみ待機 + ドローン遠隔視点
+- プレイヤーはドローンを回収または破棄できる。
+- ドローン破壊時は、そのレイド中は再使用不可、または予備機がある場合のみ再展開可とする。
+- 将来的に静音型、回収型、妨害型へ拡張する余地は残すが、本章では **軽量 / 重量の偵察型 4種類** のみを定義する。
+
+### データ構造
+
+| フィールド名 | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `DroneId` | `FName` | ✅ | 主キー。例: `drone_ground_light_01` |
+| `DisplayName` | `FText` | ✅ | 表示名 |
+| `DroneType` | `ENUM_BX_DroneType` | ✅ | ドローン種別（Ground / Air） |
+| `WeightClass` | `ENUM_BX_DroneWeightClass` | ✅ | 重量区分（Light / Heavy） |
+| `BaseMoveSpeed` | `float` | ✅ | 基本移動速度（cm/s） |
+| `MaxOperationRadius` | `float` | ✅ | 行動半径（cm） |
+| `VisionRange` | `float` | ✅ | 索敵距離（cm） |
+| `VisionAngleDeg` | `float` | ✅ | 索敵視野角（度） |
+| `TurnRateDegPerSec` | `float` | ✅ | 旋回速度（度/秒） |
+| `BatteryLifeSec` | `float` | ✅ | 連続稼働時間（秒） |
+| `DeployTimeSec` | `float` | ✅ | 展開時間（秒） |
+| `RecallTimeSec` | `float` | ✅ | 回収時間（秒） |
+| `HPMax` | `float` | ✅ | 最大耐久 |
+| `NoiseLevel` | `float` | ✅ | 動作音レベル係数 |
+| `DetectionPriority` | `int32` | ✅ | 敵 AI に見つかりやすさの優先度 |
+| `MeshRef` | `TSoftObjectPtr<UStaticMesh>` |  | 表示メッシュ |
+| `MoveSoundRef` | `TSoftObjectPtr<USoundBase>` |  | 移動音 |
+| `DestroyFXRef` | `TSoftObjectPtr<UNiagaraSystem>` |  | 破壊 FX |
+| `BehaviorTreeRef` | `TSoftObjectPtr<UBehaviorTree>` |  | 自律移動補助 BT |
+| `BlackboardRef` | `TSoftObjectPtr<UBlackboardData>` |  | Blackboard |
+| `bEnemyCanUse` | `bool` | ✅ | 敵が使用可能か |
+| `EnemyUseMode` | `ENUM_BX_DroneEnemyUseMode` | ✅ | None / RareEventOnly / BossAreaOnly |
+| `bIsStoryLocked` | `bool` | ✅ | ストーリー解放制御 |
+| `RequiredStoryFlag` | `FName` |  | 必要ストーリーフラグ |
+
+### CSV サンプル(該当する場合)
+
+```csv
+DroneId,DisplayName,DroneType,WeightClass,BaseMoveSpeed,MaxOperationRadius,VisionRange,VisionAngleDeg,TurnRateDegPerSec,BatteryLifeSec,DeployTimeSec,RecallTimeSec,HPMax,NoiseLevel,DetectionPriority,MeshRef,MoveSoundRef,DestroyFXRef,BehaviorTreeRef,BlackboardRef,bEnemyCanUse,EnemyUseMode,bIsStoryLocked,RequiredStoryFlag
+drone_ground_light_01,"Ground Recon Drone Light",Ground,Light,620,1800,1400,95,260,90,1.6,1.3,28,0.55,2,"/Game/BX/World/Drones/Meshes/SM_BX_Drone_Ground_Light.SM_BX_Drone_Ground_Light","/Game/BX/Audio/Drones/SFX_BX_Drone_Ground_Move.SFX_BX_Drone_Ground_Move","/Game/BX/FX/Drones/NS_BX_Drone_Destroy.NS_BX_Drone_Destroy","/Game/BX/AI/Drones/BT_BX_Drone_Ground_Light.BT_BX_Drone_Ground_Light","/Game/BX/AI/Drones/BB_BX_Drone_Common.BB_BX_Drone_Common",true,RareEventOnly,false,
+drone_ground_heavy_01,"Ground Recon Drone Heavy",Ground,Heavy,470,2400,1550,100,180,150,2.2,1.9,46,0.68,2,"/Game/BX/World/Drones/Meshes/SM_BX_Drone_Ground_Heavy.SM_BX_Drone_Ground_Heavy","/Game/BX/Audio/Drones/SFX_BX_Drone_Ground_Heavy_Move.SFX_BX_Drone_Ground_Heavy_Move","/Game/BX/FX/Drones/NS_BX_Drone_Destroy.NS_BX_Drone_Destroy","/Game/BX/AI/Drones/BT_BX_Drone_Ground_Heavy.BT_BX_Drone_Ground_Heavy","/Game/BX/AI/Drones/BB_BX_Drone_Common.BB_BX_Drone_Common",true,BossAreaOnly,false,
+drone_air_light_01,"Air Recon Drone Light",Air,Light,760,2200,1650,110,320,75,1.8,1.5,24,0.62,3,"/Game/BX/World/Drones/Meshes/SM_BX_Drone_Air_Light.SM_BX_Drone_Air_Light","/Game/BX/Audio/Drones/SFX_BX_Drone_Air_Move.SFX_BX_Drone_Air_Move","/Game/BX/FX/Drones/NS_BX_Drone_Destroy.NS_BX_Drone_Destroy","/Game/BX/AI/Drones/BT_BX_Drone_Air_Light.BT_BX_Drone_Air_Light","/Game/BX/AI/Drones/BB_BX_Drone_Common.BB_BX_Drone_Common",true,BossAreaOnly,false,
+drone_air_heavy_01,"Air Recon Drone Heavy",Air,Heavy,590,2800,1900,120,210,135,2.4,2.0,40,0.74,3,"/Game/BX/World/Drones/Meshes/SM_BX_Drone_Air_Heavy.SM_BX_Drone_Air_Heavy","/Game/BX/Audio/Drones/SFX_BX_Drone_Air_Heavy_Move.SFX_BX_Drone_Air_Heavy_Move","/Game/BX/FX/Drones/NS_BX_Drone_Destroy.NS_BX_Drone_Destroy","/Game/BX/AI/Drones/BT_BX_Drone_Air_Heavy.BT_BX_Drone_Air_Heavy","/Game/BX/AI/Drones/BB_BX_Drone_Common.BB_BX_Drone_Common",true,BossAreaOnly,false,
+```
+
+### Blueprint / C++ 役割分担
+
+- **C++ 側**:
+  - `FBXDroneTableRow` 定義
+  - ドローン基底 Actor `ABXDroneBase`
+  - 展開、回収、バッテリー消費、視点切替、偵察結果共有ロジック
+  - 敵限定使用フラグとイベント制御
+- **Blueprint 側**:
+  - 地上 / 空中 / 軽量 / 重量の見た目差分
+  - カメラ演出、ライト点灯、回転演出
+  - エリアごとの巡回ポイント、イベント時の敵利用設定
+- **アセット配置先**:
+  - C++: `Source/BX/Public/Data/Drones/FBXDroneTableRow.h`
+  - C++: `Source/BX/Public/AI/Drones/ABXDroneBase.h`
+  - C++: `Source/BX/Private/AI/Drones/ABXDroneBase.cpp`
+  - DataTable: `Content/BX/Data/Common/Drones/DT_BX_Drones`
+  - Blueprint: `Content/BX/AI/Drones/`
+  - Mesh: `Content/BX/World/Drones/Meshes/`
+  - Audio: `Content/BX/Audio/Drones/`
+  - CSV ソース: `DataSource/Drones/DT_BX_Drones.csv`
+
+### UI
+
+```text
+┌──────────────────────────────────────┐
+│ DRONE LINK ACTIVE                    │
+│ Battery: ███████░░░ 72%              │
+│ Range: 12m / 18m                     │
+│ Mode: Recon                          │
+└──────────────────────────────────────┘
+```
+
+### 関連章
+- §14-5
+- §15-1
+- §15-2
+- §18-2
+- §18-3
+- §21-2
+
+### 受け入れ条件
+- [ ] `DT_BX_Drones` に 4 種類のドローン行が存在する
+- [ ] プレイヤーが 4 種類を展開・回収できる
+- [ ] 軽量型と重量型で速度 / 稼働時間 / 耐久の差がある
+- [ ] ドローン破壊時にその機体が使用不能になる
+- [ ] 敵のドローン使用が RareEventOnly / BossAreaOnly に限定できる
+
+---
+
+## §22-2 地上ドローン（軽量型）
+
+### 概要
+地上ドローン軽量型は、床面・配管・通路・狭所を高速移動して周辺状況を確認する軽量偵察ユニットである。  
+小回り、段差越え、狭所侵入に優れるが、長距離持続索敵や高所対応は弱い。
+
+### 仕様
+- 種別は `Ground`、重量区分は `Light` とする。
+- コンセプトは **軽量型 / スピード重視 / 行動半径はやや狭い**。
+- プレイヤーの先行偵察、近距離ルート確認、曲がり角確認に向く。
+- 旋回性能は高く、狭い場所でも切り返ししやすい。
+- 小段差の跳び越え能力を持つ。
+- `JumpHeightCm` を持ち、低い障害物を超えられる。
+- ただし高低差に弱く、広い吹き抜けや階段連続区間では効率が落ちる。
+- 行動半径は狭めで、プレイヤー本体から遠く離れにくい。
+- 地上音・転がり音があり、敵に気づかれる余地を残す。
+- 火力は持たず、偵察専用に徹する。
+- 倉庫、団地、排水路、研究施設下層との相性が良い。
+
+### データ構造
+
+| フィールド名 | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `JumpHeightCm` | `float` | ✅ | 越えられる段差高さ（cm） |
+| `MaxSlopeDeg` | `float` | ✅ | 登坂可能最大角度 |
+| `CorneringBoostRatio` | `float` | ✅ | 曲がりやすさ補正 |
+| `FloorTraceDistanceCm` | `float` | ✅ | 床追従判定距離 |
+| `PreferredPathTag` | `FGameplayTag` |  | 優先経路タグ |
+| `bCanUseVentRoute` | `bool` | ✅ | ダクト / 狭所経路使用可否 |
+
+### CSV サンプル(該当する場合)
+
+```csv
+DroneId,JumpHeightCm,MaxSlopeDeg,CorneringBoostRatio,FloorTraceDistanceCm,PreferredPathTag,bCanUseVentRoute
+drone_ground_light_01,55,38,1.30,24,"Path.Ground.Tight",true
+```
+
+### Blueprint / C++ 役割分担
+
+- **C++ 側**:
+  - 地上ドローン移動モード
+  - 段差判定、床追従、簡易ジャンプ処理
+  - 近距離偵察ルート制御
+- **Blueprint 側**:
+  - ジャンプ演出
+  - ホイール回転、ライト点滅、狭所侵入アニメ表現
+  - ルートポイント配置
+- **アセット配置先**:
+  - C++: `Source/BX/Public/AI/Drones/ABXDroneGroundBase.h`
+  - Blueprint: `Content/BX/AI/Drones/Ground/BP_BX_Drone_Ground_Light`
+  - BT: `Content/BX/AI/Drones/BT_BX_Drone_Ground_Light`
+  - BB: `Content/BX/AI/Drones/BB_BX_Drone_Common`
+
+### UI
+
+```text
+┌──────────────────────────────────────┐
+│ GROUND DRONE LIGHT ACTIVE            │
+│ Jump Ready / Tight Route Scan        │
+└──────────────────────────────────────┘
+```
+
+### 関連章
+- §22-1
+- §18-3
+
+### 受け入れ条件
+- [ ] 地上軽量ドローンが小段差を越えられる
+- [ ] 狭所で高い旋回性能を示す
+- [ ] 行動半径が地上重量型より狭い
+- [ ] 倉庫や団地で自然に移動できる
+- [ ] プレイヤーの先行偵察用途として扱える
+
+---
+
+## §22-3 地上ドローン（重量型）
+
+### 概要
+地上ドローン重量型は、軽量型より遅いが、稼働時間と安定性に優れた中距離偵察ユニットである。  
+床面偵察を長く続けられ、多少の被弾にも耐えるが、小回りとジャンプ性能は低い。
+
+### 仕様
+- 種別は `Ground`、重量区分は `Heavy` とする。
+- コンセプトは **重量型 / 安定性重視 / 稼働時間長め**。
+- 軽量型より移動速度は低い。
+- 行動半径は軽量型より広い。
+- 耐久は地上軽量型より高い。
+- 小段差は越えられるが、ジャンプ性能は低い。
+- 旋回性能は軽量型より低い。
+- 長めの連続偵察、保守的な通路確認、重装エリアの探索に向く。
+- 騒音は軽量型より大きい。
+- 下層施設、工場通路、長い保守路との相性が良い。
+
+### データ構造
+
+| フィールド名 | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `JumpHeightCm` | `float` | ✅ | 越えられる段差高さ（cm） |
+| `MaxSlopeDeg` | `float` | ✅ | 登坂可能最大角度 |
+| `CorneringBoostRatio` | `float` | ✅ | 曲がりやすさ補正 |
+| `FloorTraceDistanceCm` | `float` | ✅ | 床追従判定距離 |
+| `StabilityRatio` | `float` | ✅ | 操作安定度補正 |
+| `bCanPushSmallDebris` | `bool` | ✅ | 小型障害物を押し退け可能か |
+
+### CSV サンプル(該当する場合)
+
+```csv
+DroneId,JumpHeightCm,MaxSlopeDeg,CorneringBoostRatio,FloorTraceDistanceCm,StabilityRatio,bCanPushSmallDebris
+drone_ground_heavy_01,35,42,0.88,28,1.35,true
+```
+
+### Blueprint / C++ 役割分担
+
+- **C++ 側**:
+  - 地上重量型移動モード
+  - 安定度補正、慣性強め制御
+  - 連続偵察時のバッテリー効率補正
+- **Blueprint 側**:
+  - 重量感のある移動演出
+  - 接地エフェクト、重めの走行音
+  - 長通路向けルートポイント配置
+- **アセット配置先**:
+  - C++: `Source/BX/Public/AI/Drones/ABXDroneGroundBase.h`
+  - Blueprint: `Content/BX/AI/Drones/Ground/BP_BX_Drone_Ground_Heavy`
+  - BT: `Content/BX/AI/Drones/BT_BX_Drone_Ground_Heavy`
+  - BB: `Content/BX/AI/Drones/BB_BX_Drone_Common`
+
+### UI
+
+```text
+┌──────────────────────────────────────┐
+│ GROUND DRONE HEAVY ACTIVE            │
+│ Stable Scan / Long Route Recon       │
+└──────────────────────────────────────┘
+```
+
+### 関連章
+- §22-1
+- §18-3
+
+### 受け入れ条件
+- [ ] 地上重量型が地上軽量型より遅い
+- [ ] 地上重量型が地上軽量型より高耐久である
+- [ ] 地上重量型が地上軽量型より長時間稼働する
+- [ ] 旋回性能が軽量型より低い
+- [ ] 長い保守路や工場通路で偵察用途として扱える
+
+---
+
+## §22-4 空中ドローン（軽量型）
+
+### 概要
+空中ドローン軽量型は、上空から高速で索敵し、プレイヤーに周辺視界を与える軽量偵察ユニットである。  
+高速・高旋回・広視野に優れるが、閉所や障害物密度の高い場所では挙動制限を受ける。
+
+### 仕様
+- 種別は `Air`、重量区分は `Light` とする。
+- コンセプトは **軽量型 / スピード重視 / 行動半径はやや狭いが視野は広い**。
+- 旋回性能は非常に高い。
+- 低空ホバリングと短距離ダッシュを使い分ける。
+- 地上ドローンよりジャンプ概念は不要だが、上下移動範囲を持つ。
+- `HoverHeightMinCm`〜`HoverHeightMaxCm` の範囲で移動する。
+- 視野角、索敵距離、再捕捉性能は地上型より高い。
+- ただし閉所・天井低い場所・障害物密度の高い場所では速度が落ちる。
+- 風切り音やプロペラ音があるため、近距離なら敵に気づかれる余地を残す。
+- 空中型は屋外、吹き抜け、研究施設上層、広い工業区画との相性が良い。
+- 偵察能力は高いが、持続時間は空中重量型より短い。
+
+### データ構造
+
+| フィールド名 | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `HoverHeightMinCm` | `float` | ✅ | 最低ホバー高度（cm） |
+| `HoverHeightMaxCm` | `float` | ✅ | 最大ホバー高度（cm） |
+| `VerticalMoveSpeed` | `float` | ✅ | 上下移動速度（cm/s） |
+| `CorneringBoostRatio` | `float` | ✅ | 曲がりやすさ補正 |
+| `ObstacleAvoidanceRadiusCm` | `float` | ✅ | 障害物回避半径 |
+| `bCanUseOutdoorPatrol` | `bool` | ✅ | 屋外巡回可否 |
+
+### CSV サンプル(該当する場合)
+
+```csv
+DroneId,HoverHeightMinCm,HoverHeightMaxCm,VerticalMoveSpeed,CorneringBoostRatio,ObstacleAvoidanceRadiusCm,bCanUseOutdoorPatrol
+drone_air_light_01,120,320,340,1.45,85,true
+```
+
+### Blueprint / C++ 役割分担
+
+- **C++ 側**:
+  - 空中軽量型移動モード
+  - ホバー高度制御
+  - 上下移動と障害物回避
+  - 広視野偵察ロジック
+- **Blueprint 側**:
+  - プロペラ回転、ライト点滅、ホバー演出
+  - 高度差の見た目表現
+  - 屋外 / 屋内の巡回ポイント設定
+- **アセット配置先**:
+  - C++: `Source/BX/Public/AI/Drones/ABXDroneAirBase.h`
+  - Blueprint: `Content/BX/AI/Drones/Air/BP_BX_Drone_Air_Light`
+  - BT: `Content/BX/AI/Drones/BT_BX_Drone_Air_Light`
+  - BB: `Content/BX/AI/Drones/BB_BX_Drone_Common`
+
+### UI
+
+```text
+┌──────────────────────────────────────┐
+│ AIR DRONE LIGHT ACTIVE               │
+│ Wide Scan / Hover Recon              │
+└──────────────────────────────────────┘
+```
+
+### 関連章
+- §22-1
+- §18-3
+
+### 受け入れ条件
+- [ ] 空中軽量型がホバー高度範囲内で移動する
+- [ ] 地上型より高い旋回性能を示す
+- [ ] 視野角と索敵距離が地上型より広い
+- [ ] 屋外または吹き抜け区画で自然に移動できる
+- [ ] 高速・短時間の偵察用途として扱える
+
+---
+
+## §22-5 空中ドローン（重量型）
+
+### 概要
+空中ドローン重量型は、軽量型より低速だが、広めの行動半径、長い稼働時間、安定した上空監視能力を持つ重量偵察ユニットである。  
+上空観測や中距離の継続監視に向くが、取り回しは軽量型より鈍い。
+
+### 仕様
+- 種別は `Air`、重量区分は `Heavy` とする。
+- コンセプトは **重量型 / 継続監視重視 / 稼働時間長め**。
+- 軽量型より移動速度は低い。
+- 行動半径は軽量型より広い。
+- 耐久は空中軽量型より高い。
+- ホバー安定性が高く、長時間観測向き。
+- 旋回性能は軽量型より低い。
+- プロペラ音は軽量型より大きい。
+- 広い工業地帯、東京外縁、吹き抜け施設、港湾上空などとの相性が良い。
+- 狭い屋内では軽量型より扱いづらい。
+
+### データ構造
+
+| フィールド名 | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `HoverHeightMinCm` | `float` | ✅ | 最低ホバー高度（cm） |
+| `HoverHeightMaxCm` | `float` | ✅ | 最大ホバー高度（cm） |
+| `VerticalMoveSpeed` | `float` | ✅ | 上下移動速度（cm/s） |
+| `CorneringBoostRatio` | `float` | ✅ | 曲がりやすさ補正 |
+| `ObstacleAvoidanceRadiusCm` | `float` | ✅ | 障害物回避半径 |
+| `StabilityRatio` | `float` | ✅ | ホバー安定度補正 |
+
+### CSV サンプル(該当する場合)
+
+```csv
+DroneId,HoverHeightMinCm,HoverHeightMaxCm,VerticalMoveSpeed,CorneringBoostRatio,ObstacleAvoidanceRadiusCm,StabilityRatio
+drone_air_heavy_01,150,420,260,1.05,110,1.40
+```
+
+### Blueprint / C++ 役割分担
+
+- **C++ 側**:
+  - 空中重量型移動モード
+  - 長時間観測時の安定補正
+  - 慣性強めの空中制御
+- **Blueprint 側**:
+  - 重量感あるホバー演出
+  - プロペラ音、姿勢安定演出
+  - 広域巡回ポイント設定
+- **アセット配置先**:
+  - C++: `Source/BX/Public/AI/Drones/ABXDroneAirBase.h`
+  - Blueprint: `Content/BX/AI/Drones/Air/BP_BX_Drone_Air_Heavy`
+  - BT: `Content/BX/AI/Drones/BT_BX_Drone_Air_Heavy`
+  - BB: `Content/BX/AI/Drones/BB_BX_Drone_Common`
+
+### UI
+
+```text
+┌──────────────────────────────────────┐
+│ AIR DRONE HEAVY ACTIVE               │
+│ Stable Hover / Long Watch            │
+└──────────────────────────────────────┘
+```
+
+### 関連章
+- §22-1
+- §18-3
+
+### 受け入れ条件
+- [ ] 空中重量型が空中軽量型より遅い
+- [ ] 空中重量型が空中軽量型より高耐久である
+- [ ] 空中重量型が空中軽量型より長時間稼働する
+- [ ] 旋回性能が軽量型より低い
+- [ ] 広域監視用途として扱える
