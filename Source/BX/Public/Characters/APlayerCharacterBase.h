@@ -70,7 +70,6 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="BX|Components")
     TObjectPtr<UAC_BX_HealthBodyParts> HealthBodyPartsComponent;
 
-    // TODO Sprint 14: UAC_BX_WeaponHandler 実装後に CreateDefaultSubobject を追加
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="BX|Components")
     TObjectPtr<UAC_BX_WeaponHandler> WeaponHandlerComponent;
 

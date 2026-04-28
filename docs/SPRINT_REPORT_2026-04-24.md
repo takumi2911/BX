@@ -699,3 +699,145 @@ UHT 命名エラーを 1 件修正後、全 11 アクションのビルド完了
 - `Input_SwitchWeaponSlot` の実際の切替動作
 - `Input_FirePrimaryStarted` → WeaponHandler への発砲要求
 - `APlayerCharacterBase.WeaponHandlerComponent` を `CreateDefaultSubobject` で実体化
+
+---
+
+---
+
+# Sprint 14 実行結果 — 2026-04-28
+
+**スコープ**: §14-4 `UAC_BX_WeaponHandler` / `ABXTestWeaponPickup` / `APlayerCharacterBase` Input_* 連携
+
+## ビルド結果
+
+✅ **成功 / エラー 0** (9 アクション、初回ビルドでそのまま通過)
+
+## 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Characters/Components/AC_BX_WeaponHandler.h` | スタブ → 完全実装ヘッダに置換 |
+| `Source/BX/Private/Characters/Components/AC_BX_WeaponHandler.cpp` | EquipWeapon / SwitchWeaponSlot / FirePrimary / Reload / OnReloadComplete |
+| `Source/BX/Public/Items/ABXTestWeaponPickup.h` | IBXInteractable 実装 AActor |
+| `Source/BX/Private/Items/ABXTestWeaponPickup.cpp` | EquipWeapon 呼び出し + Destroy() |
+
+## 変更ファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `Source/BX/Public/Characters/APlayerCharacterBase.h` | `WeaponHandlerComponent` の TODO コメント削除 |
+| `Source/BX/Private/Characters/APlayerCharacterBase.cpp` | コンストラクタで `WeaponHandlerComponent = CreateDefaultSubobject<>` / `Input_FirePrimaryStarted`, `Input_ReloadTriggered`, `Input_SwitchWeaponSlot` を WeaponHandler 委譲に更新 |
+
+## 実装詳細
+
+### UAC_BX_WeaponHandler 主要関数
+
+| 関数 | 内容 |
+|------|------|
+| `EquipWeapon(Slot, RowName)` | DT から DefaultMagSize を取得し装弾数初期化、SwitchWeaponSlot を呼ぶ |
+| `SwitchWeaponSlot(NewSlot)` | CurrentSlot を更新し BP_OnWeaponSlotChanged を通知 |
+| `FirePrimary()` | クールダウン / リロード中チェック → 装弾数消費 → PerformFireTrace(BaseDamage) |
+| `PerformFireTrace(damage)` | CameraFirstPerson から前方 5000cm に ECC_Visibility LineTrace → 命中時 ApplyPointDamage |
+| `Reload()` | 残弾 > 0 なら TacticalReloadTimeSec、空なら ReloadTimeSec のタイマーをセット |
+| `OnReloadComplete()` | bIsReloading = false / 装弾数 = DefaultMagSize / BP_OnReloadComplete 通知 |
+| `GetCurrentWeaponRow()` | WeaponDataTable から CurrentSlot の Row を取得 (C++ 専用、非 UFUNCTION) |
+
+### 発砲フロー (TickComponent + FirePrimary)
+
+```
+TickComponent (毎フレーム)
+  └─ FireCooldownRemaining = max(0, remaining - DeltaTime)
+
+Input_FirePrimaryStarted
+  └─ WeaponHandlerComponent->FirePrimary()
+       ├─ cooldown > 0 → return
+       ├─ bIsReloading → return
+       ├─ 装弾数 0 → Reload() → return
+       ├─ 装弾数--
+       ├─ FireCooldownRemaining = 60.0 / RPM
+       └─ PerformFireTrace(BaseDamage)
+            └─ LineTrace → 命中 → ApplyPointDamage
+```
+
+### リロードフロー
+
+```
+Input_ReloadTriggered
+  └─ WeaponHandlerComponent->Reload()
+       ├─ bIsReloading → return
+       ├─ GetCurrentWeaponRow() → ReloadTimeSec / TacticalReloadTimeSec
+       └─ SetTimer(OnReloadComplete, time)
+            └─ OnReloadComplete()
+                 ├─ bIsReloading = false
+                 ├─ CurrentMagazineAmmo[Slot] = DefaultMagSize
+                 └─ BP_OnReloadComplete(MagSize)
+```
+
+## DT_BX_Weapons 有効な Row 名 (weapons.csv 確認)
+
+| Row Name | DisplayName | RPM | DefaultMagSize | BaseDamage |
+|----------|------------|-----|---------------|-----------|
+| `ar_556a_01` | AR-556A (AR) | 780 | 30 | 44 |
+| `hg_9a_01` | HG-9A (HG) | 420 | 15 | 34 |
+| `sr_308h_01` | SR-308H (SR) | 50 | 5 | 92 |
+
+## ユーザー対応事項 (UE5 エディタ)
+
+```
+【ステップ 1: IMC_BX_Default にキー追加】
+/Content/BX/Core/Input/IMC_BX_Default を開く:
+  - IA_BX_FirePrimary  → マウス左ボタン (Started + Completed)
+  - IA_BX_Reload       → R キー
+  - IA_BX_SwitchWeaponPrimary   → 1 キー
+  - IA_BX_SwitchWeaponSecondary → 2 キー
+  - IA_BX_SwitchWeaponPistol    → 3 キー
+  - IA_BX_SwitchWeaponMelee     → 4 キー
+  (IA アセットがなければ: Input → Input Action → Value Type: Boolean)
+
+【ステップ 2: BP_BX_Player に IA をアサイン】
+BP_BX_Player の Class Defaults → BX|Input カテゴリで上記 IA をアサイン。
+
+【ステップ 3: WeaponDataTable を設定】
+BP_BX_Player → WeaponHandlerComponent → Class Defaults → BX|Weapon:
+  - WeaponDataTable: DT_BX_Weapons をアサイン
+  (DT_BX_Weapons がなければ: Editor で /Content/BX/Data/Common/ に
+   FBXWeaponTableRow を行構造として DataTable を作成 → weapons.csv を Reimport)
+
+【ステップ 4: BP_TestWeaponPickup を作成・配置】
+1. /Content/BX/Items/ で Blueprint Class → ABXTestWeaponPickup → BP_TestWeaponPickup
+2. Class Defaults:
+   - MeshComponent → Static Mesh: Engine の Cube (細長スケールで OK)
+   - WeaponRowName: ar_556a_01
+   - TargetSlot: Primary
+3. テストレベルに配置
+
+【ステップ 5: PIE テスト】
+1. PIE 起動
+2. BP_TestWeaponPickup に近づいて E 押下 → Output Log:
+   "ABXTestWeaponPickup::OnInteract — Row=ar_556a_01 Slot=0"
+   "EquipWeapon: [AR-556A] equipped — mag=30 RPM=780 dmg=44.0"
+3. 左クリック → Output Log:
+   "Input_FirePrimaryStarted CALLED"
+   "UAC_BX_WeaponHandler::FirePrimary CALLED — Slot=0"
+   "FirePrimary: 発砲 [ar_556a_01] 残弾=29/30 cooldown=0.077"
+   命中があれば "FirePrimary: HIT → <Actor名> dist=<距離>cm dmg=44.0"
+4. R キー → "Reload: 開始 (2.20s)"、2.2 秒後 → "Reload: 完了 — ammo=30"
+5. 1〜4 キー → "Input_SwitchWeaponSlot CALLED — slot=<番号>"
+```
+
+## 技術メモ
+
+- `GetCurrentWeaponRow()` は UFUNCTION にできない (raw struct ポインタ返しは UFUNCTION 不可) — C++ 専用ヘルパー
+- Reload タイマー: 残弾 > 0 → TacticalReloadTimeSec、空マガジン → ReloadTimeSec の 2 段階
+- `FireCooldownRemaining = 60.0 / RPM` で RPM → 秒/発 変換 (例: RPM=780 → 約 0.077 秒)
+- `UGameplayStatics::ApplyPointDamage` の DamageTypeClass は `nullptr` で渡す (Sprint 15 で BXDamageType に変更)
+- `WeaponDataTable が NULL` エラーが出る場合: BP_BX_Player の WeaponHandlerComponent > Class Defaults で DT_BX_Weapons をアサインする
+
+## 次スプリント (Sprint 15) 推奨内容
+
+§14-5 ダメージ計算モデルの実装:
+- `EBXBodyPart` 部位判定 (Hit の BoneName から判定)
+- `EBXArmorClass` 防具貫通計算
+- `FBXAmmoTableRow` を参照した貫通値 vs 防具閾値チェック
+- `UAC_BX_HealthBodyParts` の実装 (部位別 HP 管理)
+- 命中時の `ApplyPointDamage` を部位・防具加味した実効ダメージに変更

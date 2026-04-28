@@ -45,8 +45,8 @@ APlayerCharacterBase::APlayerCharacterBase()
     InventoryComponent    = CreateDefaultSubobject<UAC_BX_Inventory>(TEXT("InventoryComponent"));
     StatusEffectsComponent = CreateDefaultSubobject<UAC_BX_StatusEffects>(TEXT("StatusEffectsComponent"));
 
-    // TODO Sprint 14: UAC_BX_WeaponHandler 実装後に CreateDefaultSubobject を追加
     // TODO Sprint XX: UAC_BX_HealthBodyParts 実装後に CreateDefaultSubobject を追加
+    WeaponHandlerComponent     = CreateDefaultSubobject<UAC_BX_WeaponHandler>(TEXT("WeaponHandlerComponent"));
     PlayerInteractionComponent = CreateDefaultSubobject<UAC_BX_PlayerInteraction>(TEXT("PlayerInteractionComponent"));
 
     // 三人称メッシュ: 継承メッシュを BeginPlay で代入 (Mesh3P = GetMesh())
@@ -383,10 +383,19 @@ void APlayerCharacterBase::Input_LeanRightCompleted()
 
 void APlayerCharacterBase::Input_FirePrimaryStarted()
 {
+    UE_LOG(LogTemp, Warning, TEXT("Input_FirePrimaryStarted CALLED"));
     if (bInputLocked) { return; }
     CurrentCombatState = EBXCombatState::Firing;
     BP_OnCombatStateChanged(CurrentCombatState);
-    UE_LOG(LogTemp, Verbose, TEXT("Input_FirePrimaryStarted"));
+
+    if (IsValid(WeaponHandlerComponent))
+    {
+        WeaponHandlerComponent->FirePrimary();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Input_FirePrimaryStarted: WeaponHandlerComponent is NULL"));
+    }
 }
 
 void APlayerCharacterBase::Input_FirePrimaryCompleted()
@@ -410,18 +419,36 @@ void APlayerCharacterBase::Input_FireSecondaryTriggered()
 
 void APlayerCharacterBase::Input_ReloadTriggered()
 {
+    UE_LOG(LogTemp, Warning, TEXT("Input_ReloadTriggered CALLED"));
     if (bInputLocked) { return; }
     CurrentCombatState = EBXCombatState::Reloading;
     BP_OnCombatStateChanged(CurrentCombatState);
-    UE_LOG(LogTemp, Log, TEXT("Input_ReloadTriggered — TODO: WeaponHandlerComponent (Sprint 14)"));
+
+    if (IsValid(WeaponHandlerComponent))
+    {
+        WeaponHandlerComponent->Reload();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Input_ReloadTriggered: WeaponHandlerComponent is NULL"));
+    }
 }
 
 void APlayerCharacterBase::Input_SwitchWeaponSlot(EBXWeaponSlot WeaponSlot)
 {
+    UE_LOG(LogTemp, Warning, TEXT("Input_SwitchWeaponSlot CALLED — slot=%d"), static_cast<int32>(WeaponSlot));
     if (bInputLocked) { return; }
     CurrentCombatState = EBXCombatState::Switching;
     BP_OnCombatStateChanged(CurrentCombatState);
-    UE_LOG(LogTemp, Log, TEXT("Input_SwitchWeaponSlot: %d — TODO: WeaponHandlerComponent (Sprint 14)"), static_cast<int32>(WeaponSlot));
+
+    if (IsValid(WeaponHandlerComponent))
+    {
+        WeaponHandlerComponent->SwitchWeaponSlot(WeaponSlot);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Input_SwitchWeaponSlot: WeaponHandlerComponent is NULL"));
+    }
 }
 
 void APlayerCharacterBase::Input_HolsterTriggered()
