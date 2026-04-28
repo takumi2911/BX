@@ -586,3 +586,116 @@ Sprint 12 の目標は「PIE で実際にプレイヤーが動く」状態の確
 - `IA_BX_Look` も Vector2D 型 → `AddControllerYawInput(X)` / `AddControllerPitchInput(Y)`
 - `IMC` で Mouse XY をそのまま `IA_BX_Look` に繋ぐと Y 軸の感度が逆になる場合は `Negate` Modifier を追加する
 - Sprint → Run 遷移: Sprint キー Released 時に `MaxWalkSpeed` を戻すため `ETriggerEvent::Completed` を使用
+
+---
+
+---
+
+# Sprint 13 実行結果 — 2026-04-28
+
+**スコープ**: §23-7 `UAC_BX_PlayerInteraction` / `IBXInteractable` インターフェース / テスト用ピックアップ Actor
+
+## ビルド結果
+
+✅ **成功 / エラー 0**  
+UHT 命名エラーを 1 件修正後、全 11 アクションのビルド完了。
+
+### UHT 命名エラーと修正 (ビルド 1 回目)
+
+- `UBXInteractableInterface` + `IBXInteractable` → **UHT ルール違反**
+  - UHT の規則: `U` 側と `I` 側はベース名が一致しなければならない
+  - 修正: `UBXInteractableInterface` → `UBXInteractable`（`IBXInteractable` と対応）
+- `AC_BX_PlayerInteraction.cpp` の `Implements<UBXInteractableInterface>()` も `Implements<UBXInteractable>()` に修正
+
+⚠️ **CLAUDE.md §4-2 の記載ミス確認**:  
+`Interface は IBX と UBX...Interface のペア` とあるが、UHT は `U/I` のベース名の一致を要求するため `UBXInteractableInterface + IBXInteractableInterface` か `UBXInteractable + IBXInteractable` のどちらかが正しい。今後は `UBXXxx + IBXXxx` パターンを採用する。
+
+## 新規ファイル
+
+| ファイル | 内容 |
+|---------|------|
+| `Source/BX/Public/Interaction/BXInteractableInterface.h` | `UBXInteractable` + `IBXInteractable` インターフェース (BlueprintNativeEvent 3 関数) |
+| `Source/BX/Private/Interaction/BXInteractableInterface.cpp` | 最小 .cpp |
+| `Source/BX/Public/Characters/Components/AC_BX_PlayerInteraction.h` | スタブ → 完全実装ヘッダに置換 |
+| `Source/BX/Private/Characters/Components/AC_BX_PlayerInteraction.cpp` | LineTrace + フォーカス管理 + TryInteract 実装 |
+| `Source/BX/Public/Items/ABXTestPickupItem.h` | IBXInteractable 実装 AActor |
+| `Source/BX/Private/Items/ABXTestPickupItem.cpp` | AddItem + Destroy() 実装 |
+
+## 変更ファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `Source/BX/Public/Data/BXEnums.h` | `EBXInteractTargetType` (9値) 追加 |
+| `Source/BX/Public/Characters/APlayerCharacterBase.h` | `PlayerInteractionComponent` の TODO コメント削除 |
+| `Source/BX/Private/Characters/APlayerCharacterBase.cpp` | コンストラクタで `PlayerInteractionComponent = CreateDefaultSubobject<>` / `Input_InteractTriggered` を `TryInteract()` 呼び出しに更新 |
+
+## 実装詳細
+
+### IBXInteractable インターフェース
+
+| 関数 | 種別 | 内容 |
+|------|------|------|
+| `OnInteract(APlayerCharacterBase*)` | BlueprintNativeEvent | インタラクト実行 |
+| `GetInteractionPrompt() const` | BlueprintNativeEvent | UI 表示プロンプト文字列 |
+| `CanInteract(APlayerCharacterBase*) const` | BlueprintNativeEvent | インタラクト可否チェック |
+
+### UAC_BX_PlayerInteraction
+
+- `TickComponent` 毎フレーム `ScanForInteractable()` を呼ぶ
+- `ScanForInteractable()`: `CameraFirstPerson` 位置から前方 250cm に `ECC_Visibility` LineTrace
+- ヒット Actor が `IBXInteractable` を実装 + `CanInteract` 返値 true → `CurrentFocusedActor` に設定
+- `TryInteract()`: フォーカス対象に `Execute_OnInteract()` を呼ぶ
+- `FocusedTargetType` は現在 `Generic` 固定（TODO: Sprint 後続で種別自動判定を追加）
+
+### ABXTestPickupItem
+
+- `AddItem()` 呼び出し（`TryAddItem` ではない — `UAC_BX_Inventory` の実際の関数名）
+- 成功時 `Destroy()` でアクターを消去
+- `CanInteract`: `ItemRowName != NAME_None` のみチェック
+
+## ユーザー対応事項 (UE5 エディタ)
+
+```
+【ステップ 1: IMC_BX_Default に E キーを追加】
+1. /Content/BX/Core/Input/IMC_BX_Default を開く
+2. + ボタン → IA_BX_Interact を選択 → キー: E (Digital/Bool)
+   ※IA_BX_Interact がなければ: Input → Input Action → Value Type: Boolean
+
+【ステップ 2: BP_TestPickupItem を作成】
+1. /Content/BX/Items/ (または /Dev/) に移動
+2. 右クリック → Blueprint Class → ABXTestPickupItem を選択
+3. 名前: BP_TestPickupItem
+4. Class Defaults を開き:
+   - MeshComponent → Static Mesh: Engine の Cube (SM_Cube 等)
+   - ItemRowName: DT_BX_Items に存在する Row Name を入力
+     (例: ammo_545x39_ps、または任意の items.csv の Name 列の値)
+   - Quantity: 30 等
+
+【ステップ 3: テストレベルに配置・PIE 確認】
+1. LV_Test_Player (または任意のレベル) のフロアに BP_TestPickupItem を配置
+2. PIE 起動
+3. プレイヤーをアイテムに近づける (250cm 以内)
+4. Output Log で確認:
+   - "UAC_BX_PlayerInteraction: Focus → BP_TestPickupItem_0 [拾う]"
+5. E キー押下 → Output Log で確認:
+   - "Input_InteractTriggered CALLED"
+   - "UAC_BX_PlayerInteraction::TryInteract CALLED"
+   - "TryInteract: OnInteract → BP_TestPickupItem_0"
+   - "ABXTestPickupItem::OnInteract — Item=ammo_545x39_ps Qty=30"
+   - "ABXTestPickupItem: Pickup 成功 → ammo_545x39_ps x30"
+6. アイテムが消える + Inventory.Items 配列に追加されていることを確認
+```
+
+## 技術メモ
+
+- `IBXInteractable::Execute_OnInteract(Actor, Player)` が UHT 生成の静的ディスパッチャ。C++ 実装 → `_Implementation()` を呼ぶ、BP オーバーライドがあれば BP 側を呼ぶ
+- `UAC_BX_Inventory::AddItem(FName, int32, bool)` — 計画書に `TryAddItem` とあったが実際の関数名は `AddItem`
+- `UBXInteractable` + `IBXInteractable` ペア — UHT ルール: `UXxx` には `IXxx`（同ベース名）が必須
+
+## 次スプリント (Sprint 14) 推奨内容
+
+`AC_BX_WeaponHandler` の実装。§14-4 / §14-5 武器システムの基盤:
+- 武器スロット管理 (Primary / Secondary / Pistol / Melee)
+- `Input_SwitchWeaponSlot` の実際の切替動作
+- `Input_FirePrimaryStarted` → WeaponHandler への発砲要求
+- `APlayerCharacterBase.WeaponHandlerComponent` を `CreateDefaultSubobject` で実体化

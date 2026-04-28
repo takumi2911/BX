@@ -74,7 +74,6 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="BX|Components")
     TObjectPtr<UAC_BX_WeaponHandler> WeaponHandlerComponent;
 
-    // TODO Sprint 13: UAC_BX_PlayerInteraction 実装後に CreateDefaultSubobject を追加
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="BX|Components")
     TObjectPtr<UAC_BX_PlayerInteraction> PlayerInteractionComponent;
 

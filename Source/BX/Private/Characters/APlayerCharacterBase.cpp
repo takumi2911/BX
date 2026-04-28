@@ -45,8 +45,9 @@ APlayerCharacterBase::APlayerCharacterBase()
     InventoryComponent    = CreateDefaultSubobject<UAC_BX_Inventory>(TEXT("InventoryComponent"));
     StatusEffectsComponent = CreateDefaultSubobject<UAC_BX_StatusEffects>(TEXT("StatusEffectsComponent"));
 
-    // 以下は対応する C++ コンポーネントが実装されたら CreateDefaultSubobject に変更する
-    // HealthBodyPartsComponent / WeaponHandlerComponent / PlayerInteractionComponent は null のまま
+    // TODO Sprint 14: UAC_BX_WeaponHandler 実装後に CreateDefaultSubobject を追加
+    // TODO Sprint XX: UAC_BX_HealthBodyParts 実装後に CreateDefaultSubobject を追加
+    PlayerInteractionComponent = CreateDefaultSubobject<UAC_BX_PlayerInteraction>(TEXT("PlayerInteractionComponent"));
 
     // 三人称メッシュ: 継承メッシュを BeginPlay で代入 (Mesh3P = GetMesh())
 }
@@ -431,9 +432,19 @@ void APlayerCharacterBase::Input_HolsterTriggered()
 
 void APlayerCharacterBase::Input_InteractTriggered()
 {
+    UE_LOG(LogTemp, Warning, TEXT("Input_InteractTriggered CALLED"));
+
     if (bInputLocked) { return; }
     bIsInteractionActive = true;
-    UE_LOG(LogTemp, Log, TEXT("Input_InteractTriggered — TODO: PlayerInteractionComponent (Sprint 13)"));
+
+    if (IsValid(PlayerInteractionComponent))
+    {
+        PlayerInteractionComponent->TryInteract();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Input_InteractTriggered: PlayerInteractionComponent is NULL"));
+    }
 }
 
 void APlayerCharacterBase::Input_MedicalUseTriggered()

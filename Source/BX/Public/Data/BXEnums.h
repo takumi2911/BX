@@ -284,3 +284,18 @@ enum class EBXLanguage : uint8
     Japanese UMETA(DisplayName = "Japanese"),
     English  UMETA(DisplayName = "English"),
 };
+
+// インタラクト対象種別 (SPEC §23-7)
+UENUM(BlueprintType)
+enum class EBXInteractTargetType : uint8
+{
+    ExtractPoint    UMETA(DisplayName = "Extract Point"),
+    LootContainer   UMETA(DisplayName = "Loot Container"),
+    CorpseLoot      UMETA(DisplayName = "Corpse Loot"),
+    Door            UMETA(DisplayName = "Door"),
+    Switch          UMETA(DisplayName = "Switch"),
+    Terminal        UMETA(DisplayName = "Terminal"),
+    QuestObject     UMETA(DisplayName = "Quest Object"),
+    Pickup          UMETA(DisplayName = "Pickup"),
+    Generic         UMETA(DisplayName = "Generic"),
+};
