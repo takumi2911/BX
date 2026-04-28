@@ -2,7 +2,9 @@
 
 #include "Characters/Components/AC_BX_WeaponHandler.h"
 #include "Characters/APlayerCharacterBase.h"
+#include "Characters/Components/AC_BX_HealthBodyParts.h"
 #include "Data/FBXWeaponTableRow.h"
+#include "Data/BXBodyPartHelpers.h"
 #include "Engine/DataTable.h"
 #include "Camera/CameraComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -140,23 +142,49 @@ void UAC_BX_WeaponHandler::PerformFireTrace(float BaseDamage)
     const FVector End    = Start + Cam->GetForwardVector() * TraceDistance;
 
     FHitResult Hit;
-    FCollisionQueryParams Params(TEXT("WeaponTrace"), false, Player);
+    FCollisionQueryParams Params(TEXT("WeaponTrace"), true, Player);  // bTraceComplex=true でボーン名取得
+    Params.bReturnPhysicalMaterial = true;
 
     if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
     {
         AActor* HitActor = Hit.GetActor();
-        UE_LOG(LogTemp, Warning, TEXT("FirePrimary: HIT → %s dist=%.1fcm dmg=%.1f"),
-            HitActor ? *HitActor->GetName() : TEXT("NULL"),
-            Hit.Distance, BaseDamage);
+        const FName BoneName = Hit.BoneName;
 
-        if (IsValid(HitActor) && IsValid(Hit.GetComponent()))
+        // 部位ダメージルート
+        UAC_BX_HealthBodyParts* HealthComp = IsValid(HitActor)
+            ? HitActor->FindComponentByClass<UAC_BX_HealthBodyParts>()
+            : nullptr;
+
+        if (IsValid(HealthComp))
         {
-            const FVector ShotDir = (End - Start).GetSafeNormal();
-            UGameplayStatics::ApplyPointDamage(
-                HitActor, BaseDamage, ShotDir, Hit,
-                Player->GetInstigatorController(),
-                Player,
-                nullptr);  // DamageType: Sprint 15 で BXDamageType に変更
+            const EBXBodyPart Part = FBXBodyPartHelpers::BoneNameToBodyPart(BoneName);
+            const UEnum* PartEnum  = StaticEnum<EBXBodyPart>();
+            const FString PartName = PartEnum
+                ? PartEnum->GetNameStringByValue(static_cast<int64>(Part))
+                : TEXT("?");
+
+            UE_LOG(LogTemp, Warning,
+                TEXT("FirePrimary HIT: Actor=%s Bone=%s Part=%s Dmg=%.1f"),
+                *HitActor->GetName(), *BoneName.ToString(), *PartName, BaseDamage);
+
+            HealthComp->ApplyDamageToBodyPart(Part, BaseDamage);
+        }
+        else
+        {
+            // HealthBodyParts を持たない Actor は従来の ApplyPointDamage にフォールバック
+            UE_LOG(LogTemp, Warning, TEXT("FirePrimary: HIT → %s dist=%.1fcm dmg=%.1f (no HealthBodyParts)"),
+                HitActor ? *HitActor->GetName() : TEXT("NULL"),
+                Hit.Distance, BaseDamage);
+
+            if (IsValid(HitActor) && IsValid(Hit.GetComponent()))
+            {
+                const FVector ShotDir = (End - Start).GetSafeNormal();
+                UGameplayStatics::ApplyPointDamage(
+                    HitActor, BaseDamage, ShotDir, Hit,
+                    Player->GetInstigatorController(),
+                    Player,
+                    nullptr);
+            }
         }
     }
     else

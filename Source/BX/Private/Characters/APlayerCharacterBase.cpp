@@ -45,7 +45,7 @@ APlayerCharacterBase::APlayerCharacterBase()
     InventoryComponent    = CreateDefaultSubobject<UAC_BX_Inventory>(TEXT("InventoryComponent"));
     StatusEffectsComponent = CreateDefaultSubobject<UAC_BX_StatusEffects>(TEXT("StatusEffectsComponent"));
 
-    // TODO Sprint XX: UAC_BX_HealthBodyParts 実装後に CreateDefaultSubobject を追加
+    HealthBodyPartsComponent   = CreateDefaultSubobject<UAC_BX_HealthBodyParts>(TEXT("HealthBodyPartsComponent"));
     WeaponHandlerComponent     = CreateDefaultSubobject<UAC_BX_WeaponHandler>(TEXT("WeaponHandlerComponent"));
     PlayerInteractionComponent = CreateDefaultSubobject<UAC_BX_PlayerInteraction>(TEXT("PlayerInteractionComponent"));
 

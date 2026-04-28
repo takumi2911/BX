@@ -841,3 +841,105 @@ BP_BX_Player → WeaponHandlerComponent → Class Defaults → BX|Weapon:
 - `FBXAmmoTableRow` を参照した貫通値 vs 防具閾値チェック
 - `UAC_BX_HealthBodyParts` の実装 (部位別 HP 管理)
 - 命中時の `ApplyPointDamage` を部位・防具加味した実効ダメージに変更
+
+---
+
+## Sprint 15: 部位ダメージシステム基盤
+
+### 実行日時
+2026-04-28
+
+### 完了基準
+- [x] UAC_BX_HealthBodyParts 実装 (7部位 HP 管理 + ApplyDamageToBodyPart)
+- [x] BXBodyPartHelpers::BoneNameToBodyPart 実装
+- [x] AC_BX_WeaponHandler::PerformFireTrace 改修 (BoneName → 部位ダメージ)
+- [x] ABXTestDamageDummy 実装
+- [x] ビルド成功 (エラー 0)
+
+### 作成・変更ファイル
+
+| 操作 | ファイル |
+|---|---|
+| 新規 | `Source/BX/Public/Data/BXBodyPartHelpers.h` |
+| 新規 | `Source/BX/Private/Data/BXBodyPartHelpers.cpp` |
+| 置換 | `Source/BX/Public/Characters/Components/AC_BX_HealthBodyParts.h` (スタブ→完全実装) |
+| 新規 | `Source/BX/Private/Characters/Components/AC_BX_HealthBodyParts.cpp` |
+| 新規 | `Source/BX/Public/Items/ABXTestDamageDummy.h` |
+| 新規 | `Source/BX/Private/Items/ABXTestDamageDummy.cpp` |
+| 編集 | `Source/BX/Private/Characters/Components/AC_BX_WeaponHandler.cpp` (PerformFireTrace 改修) |
+| 編集 | `Source/BX/Private/Characters/APlayerCharacterBase.cpp` (HealthBodyPartsComponent CreateDefaultSubobject 追加) |
+
+### 追加した主要関数
+
+| クラス | 関数 | 説明 |
+|---|---|---|
+| `FBXBodyPartHelpers` | `BoneNameToBodyPart(FName)` | BoneName→EBXBodyPart マッピング |
+| `UAC_BX_HealthBodyParts` | `ApplyDamageToBodyPart(EBXBodyPart, float)` | 部位ダメージ適用・ログ出力・死亡判定 |
+| `UAC_BX_HealthBodyParts` | `GetBodyPartHP(EBXBodyPart)` | 現在 HP 取得 |
+| `UAC_BX_HealthBodyParts` | `GetBodyPartHPRatio(EBXBodyPart)` | HP 割合 (0.0〜1.0) 取得 |
+| `UAC_BX_HealthBodyParts` | `IsDead()` | 死亡判定 (Head=0 or Chest=0) |
+
+### ビルド結果
+- **成功 (エラー 0)** — 11 アクション、6.05 秒
+
+### EBXBodyPart 確認
+`Chest` 表記を使用 (BXEnums.h §14-5 通り)
+
+| 部位 | デフォルト最大 HP |
+|---|---|
+| Head | 35 |
+| Chest | 100 |
+| Abdomen | 70 |
+| LeftArm | 60 |
+| RightArm | 60 |
+| LeftLeg | 65 |
+| RightLeg | 65 |
+
+### SkeletalMesh 不在時の代替案
+`ABXTestDamageDummy` は `UStaticMeshComponent` (Cube) を使用。  
+StaticMesh にはボーンがないため `BoneName = NAME_None` → `BoneNameToBodyPart` がデフォルト `Chest` を返す。  
+「ダメージが届く」確認には十分。
+
+### PIE テスト手順 (ユーザー対応)
+
+1. **BP_TestDamageDummy を作成**
+   - `Content/BX/Blueprints/Items/` を開く
+   - 右クリック → Blueprint Class → 親クラス `ABXTestDamageDummy` を選択
+   - 名前: `BP_TestDamageDummy`
+   - StaticMesh の `Static Mesh` プロパティに `SM_Cube`(またはエンジン組み込みキューブ)をアサイン
+   - Save All
+
+2. **LV_Test_Player にダミーを配置**
+   - プレイヤースタートから 5〜10m 先にドラッグ配置
+   - Save All
+
+3. **PIE 起動**
+   - プレイヤーで武器ピックアップを E で拾う (Sprint 13+14 の動作)
+   - ダミーに向かって左クリックで発砲
+
+4. **出力ログで確認**
+   ```
+   FirePrimary HIT: Actor=BP_TestDamageDummy_C_0, Bone=, Part=Chest, Dmg=44.0
+   BodyPartDamage: Part=Chest HP=100→56 (-44.0) owner=BP_TestDamageDummy_C_0
+   ```
+   連射して Chest HP=0 になると:
+   ```
+   BodyPartDamage: IsDead=true (Head=35 Chest=0) owner=BP_TestDamageDummy_C_0
+   ```
+
+### 技術メモ
+
+- `bTraceComplex = true` にしないと SkeletalMesh のボーン名が取れないため変更
+- `StaticMesh` ターゲットでは `BoneName = NAME_None` → `Chest` にマップされる (仕様内)
+- `UAC_BX_HealthBodyParts` を持たない Actor には `ApplyPointDamage` フォールバックを維持
+- `StaticEnum<EBXBodyPart>()` でログ用の部位名文字列を取得
+- `APlayerCharacterBase::HealthBodyPartsComponent` に `CreateDefaultSubobject` を追加 (Sprint 19 でプレイヤーへの部位ダメージ適用時に使用)
+
+### 次スプリント (Sprint 16) 推奨内容
+
+防具貫通計算 + 弾薬種類別ダメージ (SPEC §14-5):
+- `EBXArmorClass` / `FBXArmorTableRow` 実装
+- `FBXAmmoTableRow` の貫通値フィールド追加
+- `PerformFireTrace` に防具チェックを追加: `ArmorPenetration vs ArmorClass`
+- 実効ダメージ = `BaseDamage * BodyPartMultiplier * PenetrationFactor`
+- `UAC_BX_HealthBodyParts::ApplyDamageToBodyPart` に実効ダメージを渡す
