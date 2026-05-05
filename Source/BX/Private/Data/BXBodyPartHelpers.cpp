@@ -74,3 +74,18 @@ EBXBodyPart FBXBodyPartHelpers::BoneNameToBodyPart(FName BoneName)
     UE_LOG(LogTemp, Verbose, TEXT("BoneNameToBodyPart: BoneName=%s → Chest (デフォルト)"), *BoneName.ToString());
     return EBXBodyPart::Chest;
 }
+
+float FBXBodyPartHelpers::GetBodyPartDamageMultiplier(EBXBodyPart Part)
+{
+    switch (Part)
+    {
+    case EBXBodyPart::Head:      return 4.00f;
+    case EBXBodyPart::Chest:     return 1.00f;
+    case EBXBodyPart::Abdomen:   return 1.25f;
+    case EBXBodyPart::LeftArm:   return 0.72f;
+    case EBXBodyPart::RightArm:  return 0.72f;
+    case EBXBodyPart::LeftLeg:   return 0.82f;
+    case EBXBodyPart::RightLeg:  return 0.82f;
+    default:                     return 1.00f;
+    }
+}

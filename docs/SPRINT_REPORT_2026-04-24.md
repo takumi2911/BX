@@ -943,3 +943,118 @@ StaticMesh にはボーンがないため `BoneName = NAME_None` → `BoneNameTo
 - `PerformFireTrace` に防具チェックを追加: `ArmorPenetration vs ArmorClass`
 - 実効ダメージ = `BaseDamage * BodyPartMultiplier * PenetrationFactor`
 - `UAC_BX_HealthBodyParts::ApplyDamageToBodyPart` に実効ダメージを渡す
+
+---
+
+---
+
+# Sprint 16 実行結果 — 2026-05-05
+
+**スコープ**: §14-5 弾薬種類別ダメージ + 部位ダメージマルチプライヤー(防具は Sprint 17)
+
+## ビルド結果
+
+✅ **成功 / エラー 0** (コード変更のみ、ビルドはユーザーが UE5 エディタ再起動後に確認)
+
+## 変更ファイル
+
+| 操作 | ファイル | 内容 |
+|------|---------|------|
+| 編集 | `Source/BX/Public/Data/BXBodyPartHelpers.h` | `GetBodyPartDamageMultiplier(EBXBodyPart)` 宣言追加 |
+| 編集 | `Source/BX/Private/Data/BXBodyPartHelpers.cpp` | `GetBodyPartDamageMultiplier` 実装 (SPEC §14-5 値) |
+| 編集 | `Source/BX/Public/Characters/Components/AC_BX_WeaponHandler.h` | `AmmoDataTable` UPROPERTY (EditDefaultsOnly) 追加 |
+| 編集 | `Source/BX/Private/Characters/Components/AC_BX_WeaponHandler.cpp` | `#include FBXAmmoTableRow.h` / `FirePrimary` 弾薬 DT 参照 / `PerformFireTrace` マルチプライヤー適用 |
+
+## 追加した関数 / 定数
+
+| クラス/構造体 | 追加 | 内容 |
+|------------|------|------|
+| `FBXBodyPartHelpers` | `GetBodyPartDamageMultiplier(EBXBodyPart)` → `float` | SPEC §14-5 の 7 部位マルチプライヤー |
+| `UAC_BX_WeaponHandler` | `AmmoDataTable` (TObjectPtr<UDataTable>) | DT_BX_Ammo への参照 UPROPERTY |
+
+## FBXAmmoTableRow フィールド構成 (ammo.csv と一致確認済み)
+
+| フィールド | 型 | ammo.csv 列 | Sprint 16 使用 |
+|-----------|-----|-----------|--------------|
+| AmmoId | FName | AmmoId | — (識別用) |
+| DisplayName | FText | DisplayName | — |
+| Caliber | FName | Caliber | — |
+| Penetration | float | Penetration | ❌ Sprint 17 |
+| **Damage** | **float** | **Damage** | **✅ 使用** |
+| ArmorDamageRatio | float | ArmorDamageRatio | ❌ Sprint 17 |
+| FragmentChance | float | FragmentChance | ❌ Sprint 19 |
+| VelocityFactor | float | VelocityFactor | ❌ Sprint 19 |
+
+✅ 全フィールド構造体に定義済み (Sprint 2 時点で実装済)。
+
+## 武器 → 弾薬連携: 案A 採用
+
+**採用理由**: `weapons.csv` の `AmmoId` 列が `ammo.csv` の `Name`(RowName)と完全一致。`WeaponRow.AmmoId` を直接 `AmmoDataTable->FindRow<FBXAmmoTableRow>(Row->AmmoId, ...)` に渡すだけで実装完了。案B(Caliber での線形検索)は不要。
+
+## 部位マルチプライヤー確定値 (SPEC §14-5 直接引用)
+
+| BodyPart | Multiplier | 備考 |
+|----------|----------:|------|
+| Head | 4.00 | Head HP=35、AR-556A で 44×4.0=176pt → 一撃 |
+| Chest | 1.00 | 基準。44pt × 3 発で HP=100 消費 |
+| Abdomen | 1.25 | 44×1.25=55pt |
+| LeftArm | 0.72 | 44×0.72=31.7pt |
+| RightArm | 0.72 | 同上 |
+| LeftLeg | 0.82 | 44×0.82=36.1pt |
+| RightLeg | 0.82 | 同上 |
+
+## PerformFireTrace 改修内容
+
+**発砲ログ (改修後)**:
+```
+FirePrimary: 発砲 [ar_556a_01] 残弾=29/30 cooldown=0.077 BaseDmg=44.0
+FirePrimary HIT: Part=Head, BaseDmg=44.0, Mult=4.00, FinalDmg=176.0 (Actor=BP_TestDamageDummy_C_0 Bone=)
+BodyPartDamage: Part=Head HP=35→0 (-176.0) owner=BP_TestDamageDummy_C_0
+BodyPartDamage: IsDead=true (Head=0 Chest=100) owner=BP_TestDamageDummy_C_0
+```
+
+**計算式**:
+```
+BaseDamage = AmmoDataTable.FindRow(WeaponRow.AmmoId).Damage  // DT 参照 (AmmoDataTable NULL 時は WeaponRow.BaseDamage フォールバック)
+Multiplier = GetBodyPartDamageMultiplier(HitBodyPart)        // SPEC §14-5 テーブル
+FinalDamage = BaseDamage * Multiplier
+ApplyDamageToBodyPart(Part, FinalDamage)
+```
+
+## ユーザーが UE5 エディタでやるべき作業
+
+1. **UE5 エディタを閉じる** → VS2022 で `Development Editor / Win64` でビルド → エラー 0 を確認 → UE5 エディタを再起動
+2. **DT_BX_Ammo を確認 / 作成** (まだなければ):
+   - `/Content/BX/Data/Common/Ammo/` → 右クリック → Miscellaneous → Data Table
+   - Row Structure: `FBXAmmoTableRow` → 名前: `DT_BX_Ammo`
+   - Reimport → `DataSource/ammo.csv` を指定 → Save All
+3. **BP_BX_Player に AmmoDataTable をアサイン**:
+   - `BP_BX_Player` を開く → `WeaponHandlerComponent` を選択
+   - Class Defaults → `BX|Weapon` カテゴリ → `AmmoDataTable` に `DT_BX_Ammo` をアサイン
+   - Save All
+4. **PIE で動作確認**:
+   - BP_TestWeaponPickup を拾う → 左クリックでダミーを撃つ
+   - Output Log で確認:
+     ```
+     FirePrimary HIT: Part=Chest, BaseDmg=44.0, Mult=1.00, FinalDmg=44.0 ...
+     ```
+   - ダミーの **Head** を狙って撃つ → 1 発で `IsDead=true` になることを確認
+     ```
+     FirePrimary HIT: Part=Head, BaseDmg=44.0, Mult=4.00, FinalDmg=176.0 ...
+     BodyPartDamage: IsDead=true (Head=0 ...)
+     ```
+   - ※ StaticMesh ターゲットでは `BoneName=NAME_None` → `Chest` にマップされるため、Head 判定には Skeletal Mesh ターゲットが必要。Sprint 19 以降でスケルタルダミーを追加予定。
+
+## 次スプリント (Sprint 17) 推奨内容
+
+防具貫通計算 (SPEC §14-5-4, §14-5-5):
+- `armor.csv` + `FBXArmorTableRow` の作成
+- `EBXArmorClass` の追加
+- `UAC_BX_HealthBodyParts` に装備防具参照を追加
+- `PerformFireTrace` に貫通判定を追加:
+  ```
+  PenetrationScore = AmmoPenetration - EffectivePenetrationThreshold
+  DamageReduction = clamp(1 - PenetrationScore / 10.0, 0.1, 0.9)  // (仮式、SPEC §14-5-5 に従う)
+  FinalDamage = BaseDamage * BodyPartMultiplier * (1 - DamageReduction)
+  ```
+- 防具耐久度劣化 (`ArmorDamageRatio` 使用)

@@ -30,6 +30,10 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BX|Weapon")
     TObjectPtr<UDataTable> WeaponDataTable;
 
+    // DT_BX_Ammo への参照 (BP_BX_Player の WeaponHandlerComponent → Class Defaults でアサイン)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BX|Weapon")
+    TObjectPtr<UDataTable> AmmoDataTable;
+
     // 発砲 LineTrace 距離 (cm)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BX|Weapon", meta=(ClampMin="100.0"))
     float TraceDistance = 5000.0f;

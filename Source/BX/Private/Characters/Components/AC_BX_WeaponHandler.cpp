@@ -4,6 +4,7 @@
 #include "Characters/APlayerCharacterBase.h"
 #include "Characters/Components/AC_BX_HealthBodyParts.h"
 #include "Data/FBXWeaponTableRow.h"
+#include "Data/FBXAmmoTableRow.h"
 #include "Data/BXBodyPartHelpers.h"
 #include "Engine/DataTable.h"
 #include "Camera/CameraComponent.h"
@@ -123,11 +124,34 @@ void UAC_BX_WeaponHandler::FirePrimary()
     --Ammo;
     FireCooldownRemaining = (Row->RPM > 0) ? (60.0f / static_cast<float>(Row->RPM)) : 0.1f;
 
-    UE_LOG(LogTemp, Warning, TEXT("FirePrimary: 発砲 [%s] 残弾=%d/%d cooldown=%.3f"),
-        *EquippedWeaponRowNames.FindRef(CurrentSlot).ToString(),
-        Ammo, Row->DefaultMagSize, FireCooldownRemaining);
+    // 弾薬テーブルから BaseDamage を取得 (案A: WeaponRow.AmmoId → AmmoDataTable)
+    float BaseDamage = Row->BaseDamage;
+    if (IsValid(AmmoDataTable) && Row->AmmoId != NAME_None)
+    {
+        const FBXAmmoTableRow* AmmoRow = AmmoDataTable->FindRow<FBXAmmoTableRow>(
+            Row->AmmoId, TEXT("UAC_BX_WeaponHandler::FirePrimary"));
+        if (AmmoRow)
+        {
+            BaseDamage = AmmoRow->Damage;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning,
+                TEXT("FirePrimary: AmmoRow '%s' が DT_BX_Ammo に見つかりません — WeaponRow.BaseDamage=%.1f をフォールバック使用"),
+                *Row->AmmoId.ToString(), Row->BaseDamage);
+        }
+    }
+    else if (!IsValid(AmmoDataTable))
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("FirePrimary: AmmoDataTable が NULL — BP_BX_Player > WeaponHandlerComponent > Class Defaults で DT_BX_Ammo をアサインしてください"));
+    }
 
-    PerformFireTrace(Row->BaseDamage);
+    UE_LOG(LogTemp, Warning, TEXT("FirePrimary: 発砲 [%s] 残弾=%d/%d cooldown=%.3f BaseDmg=%.1f"),
+        *EquippedWeaponRowNames.FindRef(CurrentSlot).ToString(),
+        Ammo, Row->DefaultMagSize, FireCooldownRemaining, BaseDamage);
+
+    PerformFireTrace(BaseDamage);
 }
 
 void UAC_BX_WeaponHandler::PerformFireTrace(float BaseDamage)
@@ -157,17 +181,20 @@ void UAC_BX_WeaponHandler::PerformFireTrace(float BaseDamage)
 
         if (IsValid(HealthComp))
         {
-            const EBXBodyPart Part = FBXBodyPartHelpers::BoneNameToBodyPart(BoneName);
-            const UEnum* PartEnum  = StaticEnum<EBXBodyPart>();
-            const FString PartName = PartEnum
+            const EBXBodyPart Part      = FBXBodyPartHelpers::BoneNameToBodyPart(BoneName);
+            const float Multiplier      = FBXBodyPartHelpers::GetBodyPartDamageMultiplier(Part);
+            const float FinalDamage     = BaseDamage * Multiplier;
+            const UEnum* PartEnum       = StaticEnum<EBXBodyPart>();
+            const FString PartName      = PartEnum
                 ? PartEnum->GetNameStringByValue(static_cast<int64>(Part))
                 : TEXT("?");
 
             UE_LOG(LogTemp, Warning,
-                TEXT("FirePrimary HIT: Actor=%s Bone=%s Part=%s Dmg=%.1f"),
-                *HitActor->GetName(), *BoneName.ToString(), *PartName, BaseDamage);
+                TEXT("FirePrimary HIT: Part=%s, BaseDmg=%.1f, Mult=%.2f, FinalDmg=%.1f (Actor=%s Bone=%s)"),
+                *PartName, BaseDamage, Multiplier, FinalDamage,
+                *HitActor->GetName(), *BoneName.ToString());
 
-            HealthComp->ApplyDamageToBodyPart(Part, BaseDamage);
+            HealthComp->ApplyDamageToBodyPart(Part, FinalDamage);
         }
         else
         {
