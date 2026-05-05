@@ -1058,3 +1058,103 @@ ApplyDamageToBodyPart(Part, FinalDamage)
   FinalDamage = BaseDamage * BodyPartMultiplier * (1 - DamageReduction)
   ```
 - 防具耐久度劣化 (`ArmorDamageRatio` 使用)
+
+---
+
+---
+
+# Sprint 17 実行結果 — 2026-05-05
+
+**スコープ**: §14-5-4〜§14-5-9 防具貫通計算(armor.csv + FBXArmorClassRow + UAC_BX_ArmorEquipment)
+
+## ビルド結果
+
+✅ **成功 / エラー 0** (コード変更のみ、ビルドはユーザーが UE5 エディタ再起動後に確認)
+
+## 変更 / 作成ファイル
+
+| 操作 | ファイル | 内容 |
+|------|---------|------|
+| 新規 | `DataSource/armor.csv` | 防具クラス 6 段階 (ArmorClass 1〜6) |
+| 新規 | `Source/BX/Public/Data/FBXArmorTableRow.h` | `FBXArmorClassRow` + `FBXEquippedArmor` 構造体 |
+| 新規 | `Source/BX/Public/Characters/Components/AC_BX_ArmorEquipment.h` | 防具装備コンポーネント宣言 |
+| 新規 | `Source/BX/Private/Characters/Components/AC_BX_ArmorEquipment.cpp` | 防具装備コンポーネント実装 |
+| 編集 | `Source/BX/Public/Items/ABXTestDamageDummy.h` | `ArmorComponent` forward decl + UPROPERTY 追加 |
+| 編集 | `Source/BX/Private/Items/ABXTestDamageDummy.cpp` | `ArmorComponent` CreateDefaultSubobject 追加 (armor_class_3 デフォルト) |
+| 編集 | `Source/BX/Public/Characters/Components/AC_BX_WeaponHandler.h` | `PerformFireTrace` シグネチャ変更 + `FBXAmmoTableRow` forward decl 追加 |
+| 編集 | `Source/BX/Private/Characters/Components/AC_BX_WeaponHandler.cpp` | include 追加 / `FirePrimary` AmmoRow 渡し / `PerformFireTrace` §14-5-4〜§14-5-9 完全改修 |
+
+## 追加した関数 / 構造体 / コンポーネント
+
+| クラス/構造体 | 追加内容 |
+|------------|---------|
+| `FBXArmorClassRow` (USTRUCT, BlueprintType) | DT_BX_Armor 行: ArmorClass, BasePenetrationThreshold, BluntThroughputRatio, DurabilityDamageMultiplier, RepairLossRatio |
+| `FBXEquippedArmor` (USTRUCT, BlueprintType) | 装備中防具インスタンス: ArmorRowName, CurrentDurability, MaxDurability |
+| `UAC_BX_ArmorEquipment` (UActorComponent) | HasArmor / GetArmorClassRow / GetCurrentDurability / GetMaxDurability / ApplyDurabilityDamage |
+| `ABXTestDamageDummy` | `ArmorComponent` (UAC_BX_ArmorEquipment) 追加 |
+
+## SPEC §14-5-4〜§14-5-9 対応確認
+
+| SPEC 節 | 実装内容 | 実装箇所 |
+|---------|---------|---------|
+| §14-5-4 実効防具閾値 | `EffectivePenThresh = BasePenThresh * Lerp(0.55, 1.0, DurabilityRatio)` | `PerformFireTrace` |
+| §14-5-5 貫通スコア | `PenScore = AmmoRow->Penetration - EffectivePenThresh` | `PerformFireTrace` |
+| §14-5-6 貫通確率 | `if PenScore <= -15: 0%, >= +15: 100%, else: 50% + PenScore/30` | `PerformFireTrace` |
+| §14-5-7 貫通成功時ダメージ | `FinalDamage = BaseDamage * BodyPartMult * Falloff (clamp 0.7〜1.0)` | `PerformFireTrace` |
+| §14-5-8 非貫通 Blunt ダメージ | `FinalDamage = BaseDamage * BodyPartMult * BluntThroughputRatio` | `PerformFireTrace` |
+| §14-5-9 防具耐久減少 | `DurabilityDmg = BaseDamage * ArmorDamageRatio * DurabilityDamageMultiplier` | `ApplyDurabilityDamage` |
+
+## PerformFireTrace ログ出力例
+
+**貫通成功 (5.56 FMJ Pen=32 vs ArmorClass3 Thresh=28)**:
+```
+FirePrimary HIT: Part=Chest Penetrated! BaseDmg=44.0 Mult=1.00 Falloff=1.00 FinalDmg=44.0 | Pen=32.0 EffThresh=28.0 PenScore=4.00 Chance=63% Dur=100.0 (Actor=BP_TestDamageDummy_C_0)
+ArmorDurability: Part=1 Durability=100.0→53.8/100.0 (-46.2)
+BodyPartDamage: Part=Chest HP=100→56 (-44.0) owner=BP_TestDamageDummy_C_0
+```
+
+**非貫通 Blunt (9mm FMJ Pen=12 vs ArmorClass3 Thresh=28)**:
+```
+FirePrimary HIT: Part=Chest Blunt! BaseDmg=34.0 Mult=1.00 BluntRatio=0.20 FinalDmg=6.8 | Pen=12.0 EffThresh=28.0 PenScore=-16.00 Chance=0% Dur=100.0 (Actor=BP_TestDamageDummy_C_0)
+ArmorDurability: Part=1 Durability=100.0→69.4/100.0 (-30.6)
+BodyPartDamage: Part=Chest HP=100→93 (-6.8) owner=BP_TestDamageDummy_C_0
+```
+
+**防具なし (Head 命中)**:
+```
+FirePrimary HIT: Part=Head, BaseDmg=44.0, Mult=4.00, FinalDmg=176.0 (no armor) (Actor=BP_TestDamageDummy_C_0 Bone=)
+BodyPartDamage: IsDead=true (Head=0 Chest=100) owner=BP_TestDamageDummy_C_0
+```
+
+## ユーザーが UE5 エディタでやるべき作業
+
+1. **UE5 エディタを閉じる** → VS2022 で `Development Editor / Win64` ビルド → エラー 0 を確認 → UE5 エディタを再起動
+2. **DT_BX_Armor を作成**:
+   - `/Content/BX/Data/Common/Armor/` フォルダを新規作成
+   - 右クリック → Miscellaneous → Data Table → Row Structure: `FBXArmorClassRow` → 名前: `DT_BX_Armor`
+   - Reimport → `DataSource/armor.csv` を指定 → Save All
+3. **BP_TestDamageDummy を更新**:
+   - `BP_TestDamageDummy` を開く → `ArmorComponent` が表示されることを確認
+   - `ArmorComponent` → `ArmorDataTable` に `DT_BX_Armor` をアサイン
+   - `ChestArmor > ArmorRowName` = `armor_class_3`、`CurrentDurability` = 100、`MaxDurability` = 100 を確認
+   - Save All
+4. **PIE で動作確認**:
+   - BP_TestWeaponPickup を E で拾う
+   - ダミーに向けて発砲
+   - Output Log で確認:
+     - HG-9A (9mm FMJ Pen=12 vs ArmorClass3): `Blunt! ... Chance=0% FinalDmg=6.8`
+     - AR-556A (5.56 FMJ Pen=32 vs ArmorClass3 Thresh=28): `Penetrated! Chance=63% FinalDmg=44.0` (確率的)
+     - 連射して `Dur=` が下がると貫通確率が上昇することを確認
+
+## 技術メモ
+
+- `HasArmor(Part)` は Sprint 17 では `Part == Chest` かつ `CurrentDurability > 0.0f` かつ `ArmorRowName != NAME_None` の3条件
+- `AmmoRow == nullptr` の場合は防具計算をスキップ(AmmoDataTable 未設定時のフォールバック)
+- Blunt ダメージは `BodyPartMult` も乗算されるため、Chest (×1.0) での Blunt は比較的小さく、Head (×4.0) への胸部防具の誤入力を防ぐ設計
+
+## 次スプリント (Sprint 18) 推奨内容
+
+- **防具アイテム化**: `FBXArmorItemRow` 追加 + `DataSource/armor_items.csv` 作成 (ベストⅠ〜ヘルメットⅢ 等)
+- **AreaCovered**: `FBXArmorItemRow` に `TArray<EBXBodyPart> AreaCovered` を追加して複数部位カバー
+- **Head / Abdomen / 四肢防具**: `UAC_BX_ArmorEquipment` に `HeadArmor`, `AbdomenArmor`, `ArmArmor`, `LegArmor` スロット追加
+- **HasArmor / GetEquippedArmorForPart** を全部位対応に拡張

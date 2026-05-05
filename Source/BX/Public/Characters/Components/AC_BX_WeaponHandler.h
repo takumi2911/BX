@@ -9,6 +9,7 @@
 class APlayerCharacterBase;
 class UDataTable;
 struct FBXWeaponTableRow;
+struct FBXAmmoTableRow;
 
 #include "AC_BX_WeaponHandler.generated.h"
 
@@ -89,6 +90,6 @@ private:
     TWeakObjectPtr<APlayerCharacterBase> OwnerPlayer;
     FTimerHandle ReloadTimerHandle;
 
-    void PerformFireTrace(float BaseDamage);
+    void PerformFireTrace(float BaseDamage, const FBXAmmoTableRow* AmmoRow);
     void OnReloadComplete();
 };

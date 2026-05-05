@@ -3,8 +3,10 @@
 #include "Characters/Components/AC_BX_WeaponHandler.h"
 #include "Characters/APlayerCharacterBase.h"
 #include "Characters/Components/AC_BX_HealthBodyParts.h"
+#include "Characters/Components/AC_BX_ArmorEquipment.h"
 #include "Data/FBXWeaponTableRow.h"
 #include "Data/FBXAmmoTableRow.h"
+#include "Data/FBXArmorTableRow.h"
 #include "Data/BXBodyPartHelpers.h"
 #include "Engine/DataTable.h"
 #include "Camera/CameraComponent.h"
@@ -124,11 +126,12 @@ void UAC_BX_WeaponHandler::FirePrimary()
     --Ammo;
     FireCooldownRemaining = (Row->RPM > 0) ? (60.0f / static_cast<float>(Row->RPM)) : 0.1f;
 
-    // 弾薬テーブルから BaseDamage を取得 (案A: WeaponRow.AmmoId → AmmoDataTable)
+    // 弾薬テーブルから BaseDamage + AmmoRow を取得 (案A: WeaponRow.AmmoId → AmmoDataTable)
+    const FBXAmmoTableRow* AmmoRow = nullptr;
     float BaseDamage = Row->BaseDamage;
     if (IsValid(AmmoDataTable) && Row->AmmoId != NAME_None)
     {
-        const FBXAmmoTableRow* AmmoRow = AmmoDataTable->FindRow<FBXAmmoTableRow>(
+        AmmoRow = AmmoDataTable->FindRow<FBXAmmoTableRow>(
             Row->AmmoId, TEXT("UAC_BX_WeaponHandler::FirePrimary"));
         if (AmmoRow)
         {
@@ -151,10 +154,10 @@ void UAC_BX_WeaponHandler::FirePrimary()
         *EquippedWeaponRowNames.FindRef(CurrentSlot).ToString(),
         Ammo, Row->DefaultMagSize, FireCooldownRemaining, BaseDamage);
 
-    PerformFireTrace(BaseDamage);
+    PerformFireTrace(BaseDamage, AmmoRow);
 }
 
-void UAC_BX_WeaponHandler::PerformFireTrace(float BaseDamage)
+void UAC_BX_WeaponHandler::PerformFireTrace(float BaseDamage, const FBXAmmoTableRow* AmmoRow)
 {
     APlayerCharacterBase* Player = OwnerPlayer.Get();
     if (!IsValid(Player)) { return; }
@@ -162,62 +165,115 @@ void UAC_BX_WeaponHandler::PerformFireTrace(float BaseDamage)
     UCameraComponent* Cam = Player->CameraFirstPerson;
     if (!IsValid(Cam)) { return; }
 
-    const FVector Start  = Cam->GetComponentLocation();
-    const FVector End    = Start + Cam->GetForwardVector() * TraceDistance;
+    const FVector Start = Cam->GetComponentLocation();
+    const FVector End   = Start + Cam->GetForwardVector() * TraceDistance;
 
     FHitResult Hit;
     FCollisionQueryParams Params(TEXT("WeaponTrace"), true, Player);  // bTraceComplex=true でボーン名取得
     Params.bReturnPhysicalMaterial = true;
 
-    if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+    if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
     {
-        AActor* HitActor = Hit.GetActor();
-        const FName BoneName = Hit.BoneName;
+        UE_LOG(LogTemp, Verbose, TEXT("FirePrimary: no hit"));
+        return;
+    }
 
-        // 部位ダメージルート
-        UAC_BX_HealthBodyParts* HealthComp = IsValid(HitActor)
-            ? HitActor->FindComponentByClass<UAC_BX_HealthBodyParts>()
-            : nullptr;
+    AActor* HitActor = Hit.GetActor();
+    const FName BoneName = Hit.BoneName;
 
-        if (IsValid(HealthComp))
+    UAC_BX_HealthBodyParts* HealthComp = IsValid(HitActor)
+        ? HitActor->FindComponentByClass<UAC_BX_HealthBodyParts>()
+        : nullptr;
+
+    if (!IsValid(HealthComp))
+    {
+        // HealthBodyParts を持たない Actor は ApplyPointDamage にフォールバック
+        UE_LOG(LogTemp, Warning, TEXT("FirePrimary: HIT → %s dist=%.1fcm dmg=%.1f (no HealthBodyParts)"),
+            HitActor ? *HitActor->GetName() : TEXT("NULL"), Hit.Distance, BaseDamage);
+
+        if (IsValid(HitActor) && IsValid(Hit.GetComponent()))
         {
-            const EBXBodyPart Part      = FBXBodyPartHelpers::BoneNameToBodyPart(BoneName);
-            const float Multiplier      = FBXBodyPartHelpers::GetBodyPartDamageMultiplier(Part);
-            const float FinalDamage     = BaseDamage * Multiplier;
-            const UEnum* PartEnum       = StaticEnum<EBXBodyPart>();
-            const FString PartName      = PartEnum
-                ? PartEnum->GetNameStringByValue(static_cast<int64>(Part))
-                : TEXT("?");
+            const FVector ShotDir = (End - Start).GetSafeNormal();
+            UGameplayStatics::ApplyPointDamage(HitActor, BaseDamage, ShotDir, Hit,
+                Player->GetInstigatorController(), Player, nullptr);
+        }
+        return;
+    }
 
+    // --- 部位判定 ---
+    const EBXBodyPart Part         = FBXBodyPartHelpers::BoneNameToBodyPart(BoneName);
+    const float BodyPartMult       = FBXBodyPartHelpers::GetBodyPartDamageMultiplier(Part);
+    const UEnum* PartEnum          = StaticEnum<EBXBodyPart>();
+    const FString PartName         = PartEnum
+        ? PartEnum->GetNameStringByValue(static_cast<int64>(Part)) : TEXT("?");
+
+    // --- 防具コンポーネント取得 ---
+    UAC_BX_ArmorEquipment* ArmorComp = HitActor->FindComponentByClass<UAC_BX_ArmorEquipment>();
+
+    float FinalDamage;
+
+    if (IsValid(ArmorComp) && ArmorComp->HasArmor(Part) && AmmoRow != nullptr)
+    {
+        // ========== SPEC §14-5-4〜§14-5-9 防具貫通計算 ==========
+
+        const FBXArmorClassRow ArmorClass  = ArmorComp->GetArmorClassRow(Part);
+        const float CurrentDur             = ArmorComp->GetCurrentDurability(Part);
+        const float MaxDur                 = ArmorComp->GetMaxDurability(Part);
+
+        // §14-5-4 実効防具閾値
+        const float DurabilityRatio        = FMath::Clamp(CurrentDur / FMath::Max(1.0f, MaxDur), 0.0f, 1.0f);
+        const float EffectivePenThresh     = ArmorClass.BasePenetrationThreshold * FMath::Lerp(0.55f, 1.0f, DurabilityRatio);
+
+        // §14-5-5 貫通スコア
+        const float PenScore               = AmmoRow->Penetration - EffectivePenThresh;
+
+        // §14-5-6 貫通確率
+        float PenChance;
+        if      (PenScore <= -15.0f) { PenChance = 0.0f; }
+        else if (PenScore >=  15.0f) { PenChance = 1.0f; }
+        else                         { PenChance = 0.5f + (PenScore / 30.0f); }
+
+        // ランダムロール
+        const bool bPenetrated = FMath::FRand() < PenChance;
+
+        if (bPenetrated)
+        {
+            // §14-5-7 貫通成功時ダメージ
+            const float Falloff = FMath::Clamp(
+                1.0f - FMath::Max(0.0f, EffectivePenThresh - AmmoRow->Penetration) * 0.01f,
+                0.70f, 1.00f);
+            FinalDamage = BaseDamage * BodyPartMult * Falloff;
             UE_LOG(LogTemp, Warning,
-                TEXT("FirePrimary HIT: Part=%s, BaseDmg=%.1f, Mult=%.2f, FinalDmg=%.1f (Actor=%s Bone=%s)"),
-                *PartName, BaseDamage, Multiplier, FinalDamage,
-                *HitActor->GetName(), *BoneName.ToString());
-
-            HealthComp->ApplyDamageToBodyPart(Part, FinalDamage);
+                TEXT("FirePrimary HIT: Part=%s Penetrated! BaseDmg=%.1f Mult=%.2f Falloff=%.2f FinalDmg=%.1f | Pen=%.1f EffThresh=%.1f PenScore=%.2f Chance=%.0f%% Dur=%.1f (Actor=%s)"),
+                *PartName, BaseDamage, BodyPartMult, Falloff, FinalDamage,
+                AmmoRow->Penetration, EffectivePenThresh, PenScore, PenChance * 100.0f,
+                CurrentDur, *HitActor->GetName());
         }
         else
         {
-            // HealthBodyParts を持たない Actor は従来の ApplyPointDamage にフォールバック
-            UE_LOG(LogTemp, Warning, TEXT("FirePrimary: HIT → %s dist=%.1fcm dmg=%.1f (no HealthBodyParts)"),
-                HitActor ? *HitActor->GetName() : TEXT("NULL"),
-                Hit.Distance, BaseDamage);
-
-            if (IsValid(HitActor) && IsValid(Hit.GetComponent()))
-            {
-                const FVector ShotDir = (End - Start).GetSafeNormal();
-                UGameplayStatics::ApplyPointDamage(
-                    HitActor, BaseDamage, ShotDir, Hit,
-                    Player->GetInstigatorController(),
-                    Player,
-                    nullptr);
-            }
+            // §14-5-8 非貫通(Blunt)ダメージ
+            FinalDamage = BaseDamage * BodyPartMult * ArmorClass.BluntThroughputRatio;
+            UE_LOG(LogTemp, Warning,
+                TEXT("FirePrimary HIT: Part=%s Blunt! BaseDmg=%.1f Mult=%.2f BluntRatio=%.2f FinalDmg=%.1f | Pen=%.1f EffThresh=%.1f PenScore=%.2f Chance=%.0f%% Dur=%.1f (Actor=%s)"),
+                *PartName, BaseDamage, BodyPartMult, ArmorClass.BluntThroughputRatio, FinalDamage,
+                AmmoRow->Penetration, EffectivePenThresh, PenScore, PenChance * 100.0f,
+                CurrentDur, *HitActor->GetName());
         }
+
+        // §14-5-9 防具耐久減少
+        const float DurabilityDmg = BaseDamage * AmmoRow->ArmorDamageRatio * ArmorClass.DurabilityDamageMultiplier;
+        ArmorComp->ApplyDurabilityDamage(Part, DurabilityDmg);
     }
     else
     {
-        UE_LOG(LogTemp, Verbose, TEXT("FirePrimary: no hit"));
+        // 防具なし (Sprint 16 ロジック)
+        FinalDamage = BaseDamage * BodyPartMult;
+        UE_LOG(LogTemp, Warning,
+            TEXT("FirePrimary HIT: Part=%s, BaseDmg=%.1f, Mult=%.2f, FinalDmg=%.1f (no armor) (Actor=%s Bone=%s)"),
+            *PartName, BaseDamage, BodyPartMult, FinalDamage, *HitActor->GetName(), *BoneName.ToString());
     }
+
+    HealthComp->ApplyDamageToBodyPart(Part, FinalDamage);
 }
 
 // =========================================================

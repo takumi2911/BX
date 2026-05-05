@@ -1,0 +1,7 @@
+Name,ArmorClass,BasePenetrationThreshold,BluntThroughputRatio,DurabilityDamageMultiplier,RepairLossRatio
+armor_class_1,1,10.0,0.28,1.20,0.08
+armor_class_2,2,18.0,0.24,1.10,0.10
+armor_class_3,3,28.0,0.20,1.00,0.12
+armor_class_4,4,38.0,0.16,0.90,0.15
+armor_class_5,5,48.0,0.13,0.82,0.18
+armor_class_6,6,58.0,0.10,0.75,0.22
