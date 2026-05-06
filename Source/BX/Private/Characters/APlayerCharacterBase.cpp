@@ -12,6 +12,8 @@
 #include "Characters/Components/AC_BX_HealthBodyParts.h"
 #include "Characters/Components/AC_BX_WeaponHandler.h"
 #include "Characters/Components/AC_BX_PlayerInteraction.h"
+#include "UI/BXHUDWidget.h"
+#include "Blueprint/UserWidget.h"
 
 APlayerCharacterBase::APlayerCharacterBase()
 {
@@ -58,11 +60,59 @@ void APlayerCharacterBase::BeginPlay()
 
     Mesh3P = GetMesh();
     InitializePlayerCharacter();
+
+    // HUD Widget 作成 (BP_BX_Player の HUDWidgetClass に WBP_BX_HUD をアサインしてから有効)
+    if (IsValid(HUDWidgetClass))
+    {
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
+        {
+            HUDWidgetInstance = CreateWidget<UBXHUDWidget>(PC, HUDWidgetClass);
+            if (IsValid(HUDWidgetInstance))
+            {
+                HUDWidgetInstance->AddToViewport();
+                HUDWidgetInstance->SetOwningPlayer(this);
+                UE_LOG(LogTemp, Log, TEXT("BXHUDWidget: Created and added to viewport"));
+            }
+        }
+    }
 }
 
 void APlayerCharacterBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+
+    if (!IsValid(HUDWidgetInstance)) { return; }
+
+    // 部位 HP 更新 (7 部位)
+    if (IsValid(HealthBodyPartsComponent))
+    {
+        static const EBXBodyPart AllParts[] = {
+            EBXBodyPart::Head,
+            EBXBodyPart::Chest,
+            EBXBodyPart::Abdomen,
+            EBXBodyPart::LeftArm,
+            EBXBodyPart::RightArm,
+            EBXBodyPart::LeftLeg,
+            EBXBodyPart::RightLeg
+        };
+        for (EBXBodyPart Part : AllParts)
+        {
+            HUDWidgetInstance->OnUpdateBodyPartHP(Part, HealthBodyPartsComponent->GetBodyPartHPRatio(Part));
+        }
+    }
+
+    // 弾薬更新
+    if (IsValid(WeaponHandlerComponent))
+    {
+        const int32 CurrentAmmo = WeaponHandlerComponent->GetCurrentMagazineAmmo();
+        const int32 MagSize     = WeaponHandlerComponent->GetMagazineCapacity();
+        HUDWidgetInstance->OnUpdateAmmo(CurrentAmmo, MagSize);
+        HUDWidgetInstance->OnUpdateCurrentWeapon(WeaponHandlerComponent->GetCurrentWeaponRowName());
+
+        // HUD 公開フィールドも更新 (BP から直接参照される場合に備える)
+        HudActiveWeaponAmmoCurrent = CurrentAmmo;
+        HudActiveWeaponAmmoMax     = MagSize;
+    }
 }
 
 void APlayerCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

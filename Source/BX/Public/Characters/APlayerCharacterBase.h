@@ -18,6 +18,7 @@ class UAC_BX_StatusEffects;
 class UAC_BX_HealthBodyParts;
 class UAC_BX_WeaponHandler;
 class UAC_BX_PlayerInteraction;
+class UBXHUDWidget;
 
 #include "APlayerCharacterBase.generated.h"
 
@@ -229,6 +230,18 @@ public:
 
     UPROPERTY(BlueprintReadOnly, Category="BX|Player|HUD")
     float HudCurrentExtractRemainingSec = 0.0f;
+
+    // =========================================================
+    // HUD ウィジェット (SPEC §16)
+    // =========================================================
+
+    // BP_BX_Player の Class Defaults でアサインする (WBP_BX_HUD)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BX|HUD")
+    TSubclassOf<UBXHUDWidget> HUDWidgetClass;
+
+    // BeginPlay で CreateWidget → AddToViewport されるインスタンス
+    UPROPERTY(BlueprintReadOnly, Category="BX|HUD")
+    TObjectPtr<UBXHUDWidget> HUDWidgetInstance;
 
     // =========================================================
     // 主要関数 (SPEC §23-4)

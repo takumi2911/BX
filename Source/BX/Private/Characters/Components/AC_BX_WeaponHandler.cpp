@@ -89,6 +89,24 @@ const FBXWeaponTableRow* UAC_BX_WeaponHandler::GetCurrentWeaponRow() const
     return WeaponDataTable->FindRow<FBXWeaponTableRow>(*RowNamePtr, TEXT("UAC_BX_WeaponHandler::GetCurrentWeaponRow"));
 }
 
+int32 UAC_BX_WeaponHandler::GetCurrentMagazineAmmo() const
+{
+    const int32* AmmoPtr = CurrentMagazineAmmo.Find(CurrentSlot);
+    return AmmoPtr ? *AmmoPtr : 0;
+}
+
+int32 UAC_BX_WeaponHandler::GetMagazineCapacity() const
+{
+    const FBXWeaponTableRow* Row = GetCurrentWeaponRow();
+    return Row ? Row->DefaultMagSize : 0;
+}
+
+FName UAC_BX_WeaponHandler::GetCurrentWeaponRowName() const
+{
+    const FName* RowName = EquippedWeaponRowNames.Find(CurrentSlot);
+    return RowName ? *RowName : NAME_None;
+}
+
 // =========================================================
 // 発砲
 // =========================================================

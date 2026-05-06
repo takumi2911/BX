@@ -1158,3 +1158,140 @@ BodyPartDamage: IsDead=true (Head=0 Chest=100) owner=BP_TestDamageDummy_C_0
 - **AreaCovered**: `FBXArmorItemRow` に `TArray<EBXBodyPart> AreaCovered` を追加して複数部位カバー
 - **Head / Abdomen / 四肢防具**: `UAC_BX_ArmorEquipment` に `HeadArmor`, `AbdomenArmor`, `ArmArmor`, `LegArmor` スロット追加
 - **HasArmor / GetEquippedArmorForPart** を全部位対応に拡張
+
+
+---
+
+---
+
+# Sprint 18 実行結果 — 2026-05-06
+
+**スコープ**: §16 HUD 基盤実装 — UBXHUDWidget (C++ 基底) + APlayerCharacterBase HUD 連携
+
+## ビルド結果
+
+C++ 実装完了 / ビルドはユーザーが UE5 エディタ再起動後に確認
+(UMG / Slate / SlateCore モジュール追加済み)
+
+## 作成・変更ファイル
+
+| 操作 | ファイル | 内容 |
+|------|---------|------|
+| 新規 | `Source/BX/Public/UI/BXHUDWidget.h` | UBXHUDWidget 基底クラス (UUserWidget 派生、BlueprintImplementableEvent 3 関数) |
+| 新規 | `Source/BX/Private/UI/BXHUDWidget.cpp` | SetOwningPlayer 実装 |
+| 編集 | `Source/BX/Public/Characters/Components/AC_BX_WeaponHandler.h` | GetCurrentMagazineAmmo / GetMagazineCapacity / GetCurrentWeaponRowName ゲッター追加 |
+| 編集 | `Source/BX/Private/Characters/Components/AC_BX_WeaponHandler.cpp` | 上記 3 ゲッター実装 |
+| 編集 | `Source/BX/Public/Characters/APlayerCharacterBase.h` | UBXHUDWidget forward decl / HUDWidgetClass (TSubclassOf) / HUDWidgetInstance (TObjectPtr) 追加 |
+| 編集 | `Source/BX/Private/Characters/APlayerCharacterBase.cpp` | #include UI/BXHUDWidget.h 追加 / BeginPlay に HUD 作成ロジック / Tick に HP・弾薬更新ロジック |
+| 編集 | `Source/BX/BX.Build.cs` | "Slate", "SlateCore" を PrivateDependencyModuleNames に追加 |
+
+## 追加した関数一覧
+
+| クラス | 関数 | 内容 |
+|-------|------|------|
+| `UBXHUDWidget` | `SetOwningPlayer(APlayerCharacterBase*)` | OwningPlayer を設定し LOG 出力 |
+| `UBXHUDWidget` | `OnUpdateBodyPartHP(EBXBodyPart, float)` | BlueprintImplementableEvent — 部位 HP 比率 (0.0〜1.0) を BP 通知 |
+| `UBXHUDWidget` | `OnUpdateAmmo(int32, int32)` | BlueprintImplementableEvent — 弾薬数 (Current, MagSize) を BP 通知 |
+| `UBXHUDWidget` | `OnUpdateCurrentWeapon(FName)` | BlueprintImplementableEvent — 装備武器 RowName を BP 通知 |
+| `UAC_BX_WeaponHandler` | `GetCurrentMagazineAmmo() const` | 現在スロットの装弾数 |
+| `UAC_BX_WeaponHandler` | `GetMagazineCapacity() const` | 現在スロットのマガジン容量 |
+| `UAC_BX_WeaponHandler` | `GetCurrentWeaponRowName() const` | 現在スロットの武器 RowName |
+
+## BX.Build.cs モジュール追加確認
+
+| モジュール | 追加場所 | 状態 |
+|----------|---------|------|
+| `"UMG"` | PublicDependencyModuleNames | Sprint 7 時点で追加済み |
+| `"Slate"` | PrivateDependencyModuleNames | Sprint 18 で追加 |
+| `"SlateCore"` | PrivateDependencyModuleNames | Sprint 18 で追加 |
+
+## 設計ポイント
+
+- `UBXHUDWidget` は C++ 基底クラス。BP 側 (WBP_BX_HUD) で `OnUpdateBodyPartHP` / `OnUpdateAmmo` をオーバーライドして実際の UI を更新する
+- Tick 毎フレーム 7 部位 HP + 弾薬を更新。BlueprintImplementableEvent が未実装の場合はノーオペレーション
+- `HudActiveWeaponAmmoCurrent` / `HudActiveWeaponAmmoMax` も同時更新 (BP から直接参照する場合に備える)
+- `HUDWidgetClass` が未アサインの場合は HUD を作成しないため、アサイン前の PIE でもエラーにならない
+
+---
+
+## ユーザーが UE5 エディタでやるべき作業
+
+### Phase 1: ビルド
+
+1. UE5 エディタを閉じる
+2. `BX.uproject` を右クリック → Generate Visual Studio project files
+3. `BX.sln` を VS2022 で開く → 構成: `Development Editor / Win64`
+4. F7 でビルド → エラー 0 を確認
+5. UE5 エディタを再起動
+
+### Phase 2: WBP_BX_HUD 作成
+
+1. Content Browser で `/Content/BX/UI/Widgets/` フォルダを作成(なければ)
+2. 右クリック → User Interface → Widget Blueprint
+3. 親クラス選択ダイアログで `BXHUDWidget` を検索・選択 → OK
+4. 名前: `WBP_BX_HUD` → Save
+
+### Phase 3: WBP_BX_HUD のレイアウト作成
+
+#### 体力ゲージ × 7 部位 (左下)
+
+1. Palette から Vertical Box を Canvas Panel 左下にドラッグ
+2. アンカー: 左下 (Bottom-Left)
+3. Vertical Box 内に Horizontal Box × 7 個を追加
+4. 各 Horizontal Box に:
+   - Text Block (部位名: "Head", "Chest", "Abdomen" 等)
+   - Progress Bar (変数名: `PB_HP_Head`, `PB_HP_Chest` ... `PB_HP_RightLeg`)
+5. 各 ProgressBar の Is Variable チェック ON
+
+#### 弾薬テキスト (右下)
+
+1. Text Block を Canvas Panel 右下にドラッグ
+2. アンカー: 右下 (Bottom-Right)
+3. 変数名: `Text_Ammo`、Is Variable チェック ON
+4. デフォルトテキスト: `"-- / --"`
+
+#### クロスヘア (中央)
+
+1. Border または Image を中央にドラッグ
+2. アンカー: 中央 (Center)
+3. サイズ: 4×4 px、色: 白
+
+### Phase 4: グラフで BlueprintImplementableEvent を実装
+
+#### OnUpdateBodyPartHP イベント
+
+1. 右クリック → 検索 "OnUpdateBodyPartHP" → Add Event
+2. Switch on EBXBodyPart ノードを接続
+3. 各 case から対応する ProgressBar の Set Percent(HPRatio) を繋ぐ
+
+#### OnUpdateAmmo イベント
+
+1. 右クリック → 検索 "OnUpdateAmmo" → Add Event
+2. Format Text ノード: `{0} / {1}` フォーマット、Current と MagSize を接続
+3. Text_Ammo の Set Text に接続
+
+### Phase 5: BP_BX_Player に HUDWidgetClass をアサイン
+
+1. BP_BX_Player を開く → Class Defaults タブ
+2. 検索ボックスに `HUD Widget Class` と入力
+3. ドロップダウンから `WBP_BX_HUD` を選択
+4. コンパイル + Ctrl+S
+
+### Phase 6: PIE で動作確認
+
+1. PIE 起動
+2. 画面に体力ゲージ 7 個 + 弾薬テキスト + クロスヘアが表示されていることを確認
+3. 武器ピックアップ (E) → 弾薬テキストが "30 / 30" になる
+4. 左クリックで発砲 → 弾薬テキストが "29 / 30" → "28 / 30" と減る
+5. R キーでリロード → 弾薬テキストが "30 / 30" に戻る
+6. ダミーに向けて連射 → 体力ゲージが減少することを確認 (自分ではなくダミーの HP)
+
+---
+
+## 次スプリント (Sprint 19) 推奨内容
+
+防具耐久度 HUD 表示 + 防具アイテム化:
+- `UAC_BX_ArmorEquipment` を Head / Abdomen / 四肢にも拡張
+- `WBP_BX_HUD` に防具耐久度バー (各部位) を追加
+- `OnUpdateArmorDurability(EBXBodyPart, float)` を `UBXHUDWidget` に追加
+- `FBXArmorItemRow` + `DataSource/armor_items.csv` の作成 (ベストI〜ヘルメットIII 等)

@@ -78,6 +78,18 @@ public:
     // 現在装備中武器の DT 行を取得 (C++ 専用: UFUNCTION は raw struct ポインタ返し不可)
     const FBXWeaponTableRow* GetCurrentWeaponRow() const;
 
+    // 現在スロットの装弾数を返す (HUD 用)
+    UFUNCTION(BlueprintPure, Category="BX|Weapon")
+    int32 GetCurrentMagazineAmmo() const;
+
+    // 現在スロットのマガジン容量を返す (HUD 用)
+    UFUNCTION(BlueprintPure, Category="BX|Weapon")
+    int32 GetMagazineCapacity() const;
+
+    // 現在スロットの武器 RowName を返す (HUD 用)
+    UFUNCTION(BlueprintPure, Category="BX|Weapon")
+    FName GetCurrentWeaponRowName() const;
+
     // --- BlueprintImplementableEvent ---
 
     UFUNCTION(BlueprintImplementableEvent, Category="BX|Weapon")
