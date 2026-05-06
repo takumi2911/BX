@@ -70,7 +70,7 @@ void APlayerCharacterBase::BeginPlay()
             if (IsValid(HUDWidgetInstance))
             {
                 HUDWidgetInstance->AddToViewport();
-                HUDWidgetInstance->SetOwningPlayer(this);
+                HUDWidgetInstance->InitializeForPlayer(this);
                 UE_LOG(LogTemp, Log, TEXT("BXHUDWidget: Created and added to viewport"));
             }
         }

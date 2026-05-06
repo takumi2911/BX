@@ -3,7 +3,7 @@
 #include "UI/BXHUDWidget.h"
 #include "Characters/APlayerCharacterBase.h"
 
-void UBXHUDWidget::SetOwningPlayer(APlayerCharacterBase* Player)
+void UBXHUDWidget::InitializeForPlayer(APlayerCharacterBase* Player)
 {
     OwningPlayer = Player;
     UE_LOG(LogTemp, Log, TEXT("BXHUDWidget: SetOwningPlayer called — %s"),

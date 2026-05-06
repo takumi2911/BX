@@ -20,8 +20,9 @@ class BX_API UBXHUDWidget : public UUserWidget
 
 public:
     // オーナープレイヤーを設定する (BeginPlay 直後に呼ぶ)
+    // ※ UUserWidget::SetOwningPlayer との名前衝突を避けるため InitializeForPlayer を使用
     UFUNCTION(BlueprintCallable, Category="BX|HUD")
-    void SetOwningPlayer(APlayerCharacterBase* Player);
+    void InitializeForPlayer(APlayerCharacterBase* Player);
 
     // 部位 HP 比率を通知 (0.0〜1.0)。BP 側でプログレスバーを更新する
     UFUNCTION(BlueprintImplementableEvent, Category="BX|HUD")
