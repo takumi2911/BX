@@ -307,6 +307,26 @@ enum class EBXDroneState : uint8
     Dead    UMETA(DisplayName = "Dead"),
 };
 
+// スポーンポイント種別 (Sprint 25)
+UENUM(BlueprintType)
+enum class EBXSpawnType : uint8
+{
+    Default    UMETA(DisplayName = "Default"),
+    Extraction UMETA(DisplayName = "Extraction"),
+    Tactical   UMETA(DisplayName = "Tactical"),
+    Hidden     UMETA(DisplayName = "Hidden"),
+};
+
+// ロケーション難易度 (Sprint 25)
+UENUM(BlueprintType)
+enum class EBXLocationDifficulty : uint8
+{
+    Easy    UMETA(DisplayName = "Easy"),
+    Normal  UMETA(DisplayName = "Normal"),
+    Hard    UMETA(DisplayName = "Hard"),
+    Extreme UMETA(DisplayName = "Extreme"),
+};
+
 // インタラクト対象種別 (SPEC §23-7)
 UENUM(BlueprintType)
 enum class EBXInteractTargetType : uint8

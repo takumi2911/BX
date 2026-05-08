@@ -1,0 +1,4 @@
+---,LocationId,DisplayName,Difficulty,MaxRaidTimeSec,MinExtractPoints,CreditsEntry,bIsAvailable,RequiredTrustLevel,Description
+IndustrialZone,IndustrialZone,Industrial Zone,Normal,2400.0,2,0,true,0,Abandoned factory complex. Moderate enemy presence and good loot.
+Warehouse,Warehouse,Warehouse District,Easy,1800.0,2,0,true,0,Storage facility. Good for beginners. Lower tier loot but safer routes.
+ForestOutpost,ForestOutpost,Forest Outpost,Hard,3000.0,3,500,true,1,Dense forest with military outpost. High risk but rare equipment spawns.

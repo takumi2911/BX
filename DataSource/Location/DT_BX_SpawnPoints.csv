@@ -1,0 +1,8 @@
+---,SpawnPointId,LocationId,DisplayName,SpawnType,bIsDefault,bIsAvailable
+IZ_Spawn_South,IZ_Spawn_South,IndustrialZone,South Entrance,Default,true,true
+IZ_Spawn_North,IZ_Spawn_North,IndustrialZone,North Fence,Tactical,false,true
+IZ_Spawn_West,IZ_Spawn_West,IndustrialZone,West Road,Hidden,false,true
+WH_Spawn_Main,WH_Spawn_Main,Warehouse,Main Gate,Default,true,true
+WH_Spawn_Side,WH_Spawn_Side,Warehouse,Side Alley,Tactical,false,true
+FO_Spawn_Trail,FO_Spawn_Trail,ForestOutpost,Forest Trail,Default,true,true
+FO_Spawn_Ridge,FO_Spawn_Ridge,ForestOutpost,Ridge Path,Hidden,false,true
