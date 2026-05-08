@@ -1,0 +1,7 @@
+---,DisplayName,ArmorRowName,AreaCovered,MaxDurability,WeightKg
+vest_1,Vest I,armor_class_1,"(Chest,Abdomen)",60.0,3.0
+vest_2,Vest II,armor_class_2,"(Chest,Abdomen)",80.0,4.5
+vest_3,Vest III,armor_class_3,"(Chest,Abdomen)",100.0,6.0
+helmet_1,Helmet I,armor_class_1,(Head),30.0,0.8
+helmet_2,Helmet II,armor_class_2,(Head),40.0,1.2
+helmet_3,Helmet III,armor_class_3,(Head),50.0,1.8

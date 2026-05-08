@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Data/FBXArmorTableRow.h"
+#include "Data/FBXArmorItemRow.h"
 #include "Data/BXEnums.h"
 
 class UDataTable;
@@ -12,7 +13,7 @@ class UDataTable;
 #include "AC_BX_ArmorEquipment.generated.h"
 
 // 防具装備コンポーネント (SPEC §14-5)
-// Sprint 17: Chest のみ対応。Sprint 18 で Head / Abdomen / 四肢を追加。
+// Sprint 17: Chest のみ / Sprint 19: 全 7 部位 + アイテム装備 API
 UCLASS(ClassGroup=(BX), BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
 class BX_API UAC_BX_ArmorEquipment : public UActorComponent
 {
@@ -21,15 +22,37 @@ class BX_API UAC_BX_ArmorEquipment : public UActorComponent
 public:
     UAC_BX_ArmorEquipment();
 
-    // DT_BX_Armor への参照 (BP の Class Defaults でアサイン)
+    // DT_BX_Armor への参照 (防具クラスパラメータ)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BX|Armor")
     TObjectPtr<UDataTable> ArmorDataTable;
 
-    // Sprint 17: Chest 防具のみ実装
+    // DT_BX_ArmorItems への参照 (アイテム定義) — Sprint 19
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="BX|Armor")
+    TObjectPtr<UDataTable> ArmorItemDataTable;
+
+    // 全 7 部位の装備スロット
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
+    FBXEquippedArmor HeadArmor;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
     FBXEquippedArmor ChestArmor;
 
-    // その部位に防具があるか (Sprint 17 は Chest のみ true)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
+    FBXEquippedArmor AbdomenArmor;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
+    FBXEquippedArmor LeftArmArmor;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
+    FBXEquippedArmor RightArmArmor;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
+    FBXEquippedArmor LeftLegArmor;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="BX|Armor")
+    FBXEquippedArmor RightLegArmor;
+
+    // その部位に防具があるか
     UFUNCTION(BlueprintCallable, Category="BX|Armor")
     bool HasArmor(EBXBodyPart Part) const;
 
@@ -48,6 +71,10 @@ public:
     // 防具耐久度にダメージを適用 (clamp 0 〜 MaxDurability)
     UFUNCTION(BlueprintCallable, Category="BX|Armor")
     void ApplyDurabilityDamage(EBXBodyPart Part, float DurabilityDamage);
+
+    // アイテムを装備する — AreaCovered の全部位にスロットをセット — Sprint 19
+    UFUNCTION(BlueprintCallable, Category="BX|Armor")
+    void EquipArmorItem(FName ItemRowName);
 
 private:
     FBXEquippedArmor* GetEquippedArmorForPart(EBXBodyPart Part);
