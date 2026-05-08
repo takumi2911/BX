@@ -67,6 +67,10 @@ node_modules/
 # Temporary archives
 *.zip
 
+# bx-harness backup directories
+_backup_sprint*/
+_backup_sprint*/**
+
 
 # Claude Code internal files
 .claude/
