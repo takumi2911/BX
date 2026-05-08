@@ -1,42 +1,58 @@
-// Copyright (c) 2026 BLACKOUT EXFIL. All rights reserved.
-
+﻿// Copyright (c) takumi2911 - BlackoutExfil
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Data/BXEnums.h"
-
-class APlayerCharacterBase;
-
 #include "BXHUDWidget.generated.h"
 
-// HUD ウィジェット基底クラス (SPEC §16)
-// C++ から BlueprintImplementableEvent で BP 側に HP / 弾薬を通知する。
-// WBP_BX_HUD はこのクラスを親クラスとして UE5 エディタで作成する。
-UCLASS(BlueprintType, Blueprintable)
+class APlayerCharacterBase;
+class UCanvasPanel;
+class UVerticalBox;
+class UProgressBar;
+class UTextBlock;
+class UBorder;
+
+UCLASS()
 class BX_API UBXHUDWidget : public UUserWidget
 {
     GENERATED_BODY()
 
 public:
-    // オーナープレイヤーを設定する (BeginPlay 直後に呼ぶ)
-    // ※ UUserWidget::SetOwningPlayer との名前衝突を避けるため InitializeForPlayer を使用
-    UFUNCTION(BlueprintCallable, Category="BX|HUD")
-    void InitializeForPlayer(APlayerCharacterBase* Player);
+    virtual TSharedRef<SWidget> RebuildWidget() override;
 
-    // 部位 HP 比率を通知 (0.0〜1.0)。BP 側でプログレスバーを更新する
-    UFUNCTION(BlueprintImplementableEvent, Category="BX|HUD")
-    void OnUpdateBodyPartHP(EBXBodyPart Part, float HPRatio);
+    UFUNCTION(BlueprintCallable, Category = "BX|HUD")
+    void InitializeForPlayer(APlayerCharacterBase* InPlayer);
 
-    // 弾薬数を通知。BP 側でテキストを更新する
-    UFUNCTION(BlueprintImplementableEvent, Category="BX|HUD")
-    void OnUpdateAmmo(int32 Current, int32 MagSize);
+    UFUNCTION(BlueprintCallable, Category = "BX|HUD")
+    void OnUpdateBodyPartHP(EBXBodyPart BodyPart, float HPRatio);
 
-    // 現在装備中武器の RowName を通知
-    UFUNCTION(BlueprintImplementableEvent, Category="BX|HUD")
+    UFUNCTION(BlueprintCallable, Category = "BX|HUD")
+    void OnUpdateAmmo(int32 CurrentAmmo, int32 MagSize);
+
+    UFUNCTION(BlueprintCallable, Category = "BX|HUD")
     void OnUpdateCurrentWeapon(FName WeaponRowName);
 
 protected:
-    UPROPERTY(BlueprintReadOnly, Category="BX|HUD")
+    UPROPERTY(Transient) TObjectPtr<UCanvasPanel> RootCanvas;
+    UPROPERTY(Transient) TObjectPtr<UBorder>      Crosshair;
+    UPROPERTY(Transient) TObjectPtr<UTextBlock>   AmmoText;
+    UPROPERTY(Transient) TObjectPtr<UVerticalBox> HPVerticalBox;
+
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_Head;
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_Chest;
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_Abdomen;
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_LeftArm;
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_RightArm;
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_LeftLeg;
+    UPROPERTY(Transient) TObjectPtr<UProgressBar> PB_HP_RightLeg;
+
+private:
+    UPROPERTY()
     TWeakObjectPtr<APlayerCharacterBase> OwningPlayer;
+
+    void BuildLayout();
+    UProgressBar* CreateBodyPartBar(UVerticalBox* Parent, FName Name);
+    UProgressBar* GetBarForBodyPart(EBXBodyPart BodyPart) const;
+    static FLinearColor ColorForRatio(float Ratio);
 };
