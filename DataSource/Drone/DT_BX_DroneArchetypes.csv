@@ -1,0 +1,4 @@
+---,ArchetypeId,DisplayName,bIsAttackDrone,MaxHP,PatrolSpeed,TrackSpeed,AttackSpeed,HoverHeight,SightRadius,SightAngleDegrees,AttackRange,AttackDamage,AttackCooldownSec,BaseAccuracy,CreditsOnKill,Description
+ReconMk1,ReconMk1,Recon Mk1,false,100.0,400.0,600.0,700.0,250.0,2500.0,90.0,0.0,0.0,0.0,0.0,30,Lightweight recon drone. Spots players and alerts nearby enemies.
+AttackMk1,AttackMk1,Attack Mk1,true,200.0,350.0,550.0,750.0,200.0,2000.0,80.0,1000.0,15.0,1.2,0.6,80,Standard attack drone. Tracks and engages with burst fire.
+HeavyAttack,HeavyAttack,Heavy Attack,true,350.0,300.0,480.0,680.0,180.0,1800.0,70.0,900.0,25.0,1.5,0.55,150,Armored attack drone. High HP and damage but slower.
