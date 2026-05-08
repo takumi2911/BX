@@ -5,6 +5,8 @@
 #include "Components/Border.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -61,7 +63,8 @@ void UBXHUDWidget::BuildLayout()
     }
 
     // HP バー (左下・7 部位)
-    HPVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("HPVerticalBox"));
+    HPVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(
+        UVerticalBox::StaticClass(), TEXT("HPVerticalBox"));
     if (UCanvasPanelSlot* CanvasSlot = RootCanvas->AddChildToCanvas(HPVerticalBox))
     {
         CanvasSlot->SetAnchors(FAnchors(0.f, 1.f, 0.f, 1.f));
@@ -80,7 +83,7 @@ void UBXHUDWidget::BuildLayout()
     PB_HP_LeftLeg  = CreateBodyPartBar(HPVerticalBox, TEXT("PB_HP_LeftLeg"));
     PB_HP_RightLeg = CreateBodyPartBar(HPVerticalBox, TEXT("PB_HP_RightLeg"));
 
-    // Sprint 19: 防具耐久度バー (右下・Head/Chest/Abdomen)
+    // Sprint 19: 防具耐久度バー (右下)
     ArmorVerticalBox = WidgetTree->ConstructWidget<UVerticalBox>(
         UVerticalBox::StaticClass(), TEXT("ArmorVerticalBox"));
     if (UCanvasPanelSlot* CanvasSlot = RootCanvas->AddChildToCanvas(ArmorVerticalBox))
@@ -96,16 +99,34 @@ void UBXHUDWidget::BuildLayout()
     PB_Armor_Head    = CreateArmorBar(ArmorVerticalBox, TEXT("PB_Armor_Head"));
     PB_Armor_Chest   = CreateArmorBar(ArmorVerticalBox, TEXT("PB_Armor_Chest"));
     PB_Armor_Abdomen = CreateArmorBar(ArmorVerticalBox, TEXT("PB_Armor_Abdomen"));
+
+    // Sprint 20: 状態異常アイコン (下中央)
+    StatusIconBox = WidgetTree->ConstructWidget<UHorizontalBox>(
+        UHorizontalBox::StaticClass(), TEXT("StatusIconBox"));
+    if (UCanvasPanelSlot* CanvasSlot = RootCanvas->AddChildToCanvas(StatusIconBox))
+    {
+        CanvasSlot->SetAnchors(FAnchors(0.5f, 1.f, 0.5f, 1.f));
+        CanvasSlot->SetAlignment(FVector2D(0.5f, 1.f));
+        CanvasSlot->SetPosition(FVector2D(0.f, -20.f));
+        CanvasSlot->SetSize(FVector2D(192.f, 28.f));
+        CanvasSlot->SetAutoSize(false);
+        CanvasSlot->SetZOrder(5);
+    }
+
+    StatusIcon_Bleed       = CreateStatusIcon(StatusIconBox, TEXT("SI_Bleed"));
+    StatusIcon_Fracture    = CreateStatusIcon(StatusIconBox, TEXT("SI_Fracture"));
+    StatusIcon_Pain        = CreateStatusIcon(StatusIconBox, TEXT("SI_Pain"));
+    StatusIcon_Dehydration = CreateStatusIcon(StatusIconBox, TEXT("SI_Dehydration"));
+    StatusIcon_Fatigue     = CreateStatusIcon(StatusIconBox, TEXT("SI_Fatigue"));
+    StatusIcon_Neuro       = CreateStatusIcon(StatusIconBox, TEXT("SI_Neuro"));
 }
 
 UProgressBar* UBXHUDWidget::CreateBodyPartBar(UVerticalBox* Parent, FName Name)
 {
     if (!Parent) { return nullptr; }
-
     UProgressBar* Bar = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), Name);
     Bar->SetPercent(1.0f);
     Bar->SetFillColorAndOpacity(ColorForRatio(1.0f));
-
     if (UVerticalBoxSlot* BoxSlot = Parent->AddChildToVerticalBox(Bar))
     {
         BoxSlot->SetPadding(FMargin(0.f, 2.f, 0.f, 2.f));
@@ -122,11 +143,9 @@ UProgressBar* UBXHUDWidget::CreateBodyPartBar(UVerticalBox* Parent, FName Name)
 UProgressBar* UBXHUDWidget::CreateArmorBar(UVerticalBox* Parent, FName Name)
 {
     if (!Parent) { return nullptr; }
-
     UProgressBar* Bar = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), Name);
     Bar->SetPercent(0.0f);
     Bar->SetFillColorAndOpacity(ArmorColorForRatio(0.0f));
-
     if (UVerticalBoxSlot* BoxSlot = Parent->AddChildToVerticalBox(Bar))
     {
         BoxSlot->SetPadding(FMargin(0.f, 1.f, 0.f, 1.f));
@@ -138,6 +157,25 @@ UProgressBar* UBXHUDWidget::CreateArmorBar(UVerticalBox* Parent, FName Name)
         BoxSlot->SetVerticalAlignment(EVerticalAlignment::VAlign_Fill);
     }
     return Bar;
+}
+
+UBorder* UBXHUDWidget::CreateStatusIcon(UHorizontalBox* Parent, FName Name)
+{
+    if (!Parent) { return nullptr; }
+    UBorder* Icon = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), Name);
+    Icon->SetBrushColor(FLinearColor(0.2f, 0.2f, 0.2f, 0.3f));  // 初期: 非アクティブ
+    Icon->SetPadding(FMargin(0.f));
+    if (UHorizontalBoxSlot* BoxSlot = Parent->AddChildToHorizontalBox(Icon))
+    {
+        BoxSlot->SetPadding(FMargin(2.f, 0.f, 2.f, 0.f));
+        FSlateChildSize ChildSize;
+        ChildSize.SizeRule = ESlateSizeRule::Fill;
+        ChildSize.Value = 1.f;
+        BoxSlot->SetSize(ChildSize);
+        BoxSlot->SetHorizontalAlignment(EHorizontalAlignment::HAlign_Fill);
+        BoxSlot->SetVerticalAlignment(EVerticalAlignment::VAlign_Fill);
+    }
+    return Icon;
 }
 
 void UBXHUDWidget::InitializeForPlayer(APlayerCharacterBase* InPlayer)
@@ -176,6 +214,25 @@ void UBXHUDWidget::OnUpdateArmorDurability(EBXBodyPart BodyPart, float Durabilit
     }
 }
 
+void UBXHUDWidget::OnUpdateStatusEffects(const TArray<EBXStatusType>& ActiveTypes)
+{
+    const FLinearColor Inactive(0.2f, 0.2f, 0.2f, 0.3f);
+
+    auto SetIcon = [&](UBorder* Icon, EBXStatusType Type)
+    {
+        if (!Icon) { return; }
+        const bool bActive = ActiveTypes.Contains(Type);
+        Icon->SetBrushColor(bActive ? StatusColorForType(Type) : Inactive);
+    };
+
+    SetIcon(StatusIcon_Bleed,       EBXStatusType::Bleed);
+    SetIcon(StatusIcon_Fracture,    EBXStatusType::Fracture);
+    SetIcon(StatusIcon_Pain,        EBXStatusType::Pain);
+    SetIcon(StatusIcon_Dehydration, EBXStatusType::Dehydration);
+    SetIcon(StatusIcon_Fatigue,     EBXStatusType::Fatigue);
+    SetIcon(StatusIcon_Neuro,       EBXStatusType::Neuro);
+}
+
 UProgressBar* UBXHUDWidget::GetBarForBodyPart(EBXBodyPart BodyPart) const
 {
     switch (BodyPart)
@@ -202,6 +259,20 @@ UProgressBar* UBXHUDWidget::GetArmorBarForBodyPart(EBXBodyPart BodyPart) const
     }
 }
 
+UBorder* UBXHUDWidget::GetStatusIconForType(EBXStatusType Type) const
+{
+    switch (Type)
+    {
+    case EBXStatusType::Bleed:       return StatusIcon_Bleed;
+    case EBXStatusType::Fracture:    return StatusIcon_Fracture;
+    case EBXStatusType::Pain:        return StatusIcon_Pain;
+    case EBXStatusType::Dehydration: return StatusIcon_Dehydration;
+    case EBXStatusType::Fatigue:     return StatusIcon_Fatigue;
+    case EBXStatusType::Neuro:       return StatusIcon_Neuro;
+    default:                         return nullptr;
+    }
+}
+
 FLinearColor UBXHUDWidget::ColorForRatio(float Ratio)
 {
     if (Ratio > 0.66f) return FLinearColor(0.0f, 1.0f, 0.0f, 1.0f);
@@ -211,8 +282,22 @@ FLinearColor UBXHUDWidget::ColorForRatio(float Ratio)
 
 FLinearColor UBXHUDWidget::ArmorColorForRatio(float Ratio)
 {
-    if (Ratio > 0.66f) return FLinearColor(0.2f, 0.8f, 1.0f, 1.0f);  // シアン (高耐久)
-    if (Ratio > 0.33f) return FLinearColor(0.2f, 0.5f, 0.8f, 1.0f);  // 青 (中耐久)
-    if (Ratio > 0.0f)  return FLinearColor(0.5f, 0.2f, 0.5f, 1.0f);  // 紫 (低耐久)
-    return FLinearColor(0.2f, 0.2f, 0.2f, 0.5f);                     // 灰 (装備なし)
+    if (Ratio > 0.66f) return FLinearColor(0.2f, 0.8f, 1.0f, 1.0f);
+    if (Ratio > 0.33f) return FLinearColor(0.2f, 0.5f, 0.8f, 1.0f);
+    if (Ratio > 0.0f)  return FLinearColor(0.5f, 0.2f, 0.5f, 1.0f);
+    return FLinearColor(0.2f, 0.2f, 0.2f, 0.5f);
+}
+
+FLinearColor UBXHUDWidget::StatusColorForType(EBXStatusType Type)
+{
+    switch (Type)
+    {
+    case EBXStatusType::Bleed:       return FLinearColor(0.9f, 0.1f, 0.1f, 1.0f);  // 赤
+    case EBXStatusType::Fracture:    return FLinearColor(0.2f, 0.5f, 1.0f, 1.0f);  // 青
+    case EBXStatusType::Pain:        return FLinearColor(1.0f, 0.6f, 0.1f, 1.0f);  // オレンジ
+    case EBXStatusType::Dehydration: return FLinearColor(0.7f, 0.5f, 0.2f, 1.0f);  // 茶
+    case EBXStatusType::Fatigue:     return FLinearColor(0.5f, 0.5f, 0.3f, 1.0f);  // 黄緑
+    case EBXStatusType::Neuro:       return FLinearColor(0.8f, 0.1f, 0.9f, 1.0f);  // 紫
+    default:                         return FLinearColor(0.5f, 0.5f, 0.5f, 1.0f);
+    }
 }

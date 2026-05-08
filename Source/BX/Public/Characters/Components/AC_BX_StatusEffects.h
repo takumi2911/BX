@@ -35,9 +35,8 @@ struct BX_API FBXActiveStatus
 };
 
 // 状態異常コンポーネント (SPEC §15-2)
-// - DataTable から DT_BX_StatusEffects を参照して効果を適用
-// - Neuro Critical は 15 秒タイマー + レイド 1 回限り
-// - 大出血は小出血を上書き
+// Sprint 20: GetCombinedAimStabilityRatio / GetCombinedADSSpeedRatio /
+//            GetCombinedStaminaRecoveryRatio / GetActiveStatusTypes を追加
 UCLASS(ClassGroup="BX", BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
 class BX_API UAC_BX_StatusEffects : public UActorComponent
 {
@@ -72,6 +71,26 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
     float GetCombinedMoveSpeedRatio() const;
 
+    // 照準安定倍率を全アクティブ効果から合成する — Sprint 20
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
+    float GetCombinedAimStabilityRatio() const;
+
+    // ADS 速度倍率を全アクティブ効果から合成する — Sprint 20
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
+    float GetCombinedADSSpeedRatio() const;
+
+    // スタミナ回復倍率を全アクティブ効果から合成する — Sprint 20
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
+    float GetCombinedStaminaRecoveryRatio() const;
+
+    // 現在アクティブな状態異常タイプ一覧 (HUD アイコン更新用) — Sprint 20
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
+    TArray<EBXStatusType> GetActiveStatusTypes() const;
+
+    // 現在アクティブな状態異常 ID 一覧 — Sprint 20
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
+    TArray<FName> GetActiveStatusIds() const;
+
     // Neuro Critical が発動中か
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="BX|Status")
     bool IsNeuroCriticalActive() const;
@@ -87,21 +106,11 @@ private:
     UPROPERTY()
     TArray<FBXActiveStatus> ActiveStatuses;
 
-    // Neuro Critical がこのレイドで既に発動済みか
     bool bNeuroCriticalUsed = false;
-
-    // Neuro Critical 残り時間 (アクティブでなければ 0)
     float NeuroCriticalCountdown = 0.0f;
 
-    // DataTable から行を取得するヘルパー
     const struct FBXStatusEffectTableRow* FindRow(FName StatusId) const;
-
-    // Tick ダメージなど効果を適用する
     void ApplyTickEffect(const struct FBXStatusEffectTableRow& Row, FBXActiveStatus& Status);
-
-    // 大出血付与時に小出血を除去する
     void EvictSmallBleedIfLargeBleed(FName IncomingStatusId);
-
-    // 乗算で各倍率を合成するヘルパー
     float CombineRatios(TFunctionRef<float(const struct FBXStatusEffectTableRow&)> Getter) const;
 };
