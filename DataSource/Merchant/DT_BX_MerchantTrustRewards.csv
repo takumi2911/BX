@@ -1,0 +1,9 @@
+---,RewardId,MerchantId,RequiredTrustLevel,RequiredQuestId,RequiredStoryFlag,RewardType,UnlockTargetId,RewardValueInt,RewardValueFloat,UIMessage,bVisibleBeforeUnlock,PriorityOrder
+rew_viktor_lv2_ammo,rew_viktor_lv2_ammo,mch_viktor,2,,,ItemPool,trade_pool_viktor_adv,0,0.0,Advanced ammo stock unlocked,true,1
+rew_viktor_lv3_weapons,rew_viktor_lv3_weapons,mch_viktor,3,,,ItemPool,trade_pool_viktor_premium,0,0.0,Premium weapon catalog available,true,2
+rew_olga_lv2_trauma,rew_olga_lv2_trauma,mch_olga,2,,,ItemPool,trade_pool_olga_adv,0,0.0,Trauma kits and surgery tools available,true,1
+rew_olga_lv3_service,rew_olga_lv3_service,mch_olga,3,,,Service,med_service_surgery,0,0.0,Surgical treatment now available,true,2
+rew_fence_lv2_storage,rew_fence_lv2_storage,mch_fence,2,,,StorageSlots,,5,0.0,Storage expanded by 5 slots,true,1
+rew_fence_lv3_storage,rew_fence_lv3_storage,mch_fence,3,,,StorageSlots,,10,0.0,Storage expanded by 10 more slots,true,2
+rew_artyom_lv2_scrap,rew_artyom_lv2_scrap,mch_artyom,2,,,ItemPool,trade_pool_artyom_adv,0,0.0,Salvage and repair parts available,true,1
+rew_artyom_lv3_respawn,rew_artyom_lv3_respawn,mch_artyom,3,,,RespawnNode,node_docks_01,0,0.0,Docks respawn node unlocked,true,2
