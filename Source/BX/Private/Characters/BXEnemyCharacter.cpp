@@ -10,6 +10,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Components/CapsuleComponent.h"
+#include "Systems/BXAlertSubsystem.h"
 
 ABXEnemyCharacter::ABXEnemyCharacter()
 {
@@ -26,6 +27,11 @@ void ABXEnemyCharacter::BeginPlay()
     Super::BeginPlay();
     InitFromArchetype();
     SetEnemyState(EBXEnemyState::Patrol);
+
+    if (UBXAlertSubsystem* AlertSys = GetWorld()->GetSubsystem<UBXAlertSubsystem>())
+    {
+        AlertSys->RegisterEnemy(this);
+    }
 }
 
 void ABXEnemyCharacter::Tick(float DeltaTime)
@@ -114,11 +120,9 @@ void ABXEnemyCharacter::FireAtTarget(AActor* Target)
         return; // miss
     }
 
-    // WeaponHandler の発砲 (Sprint 14 以降の API に依存 - StartFiring を呼ぶ)
-    // WeaponHandler->StartFiring(); // 実際の API は Sprint 14 のコードを確認
-    // 暫定: 目標方向を向いてから発砲トリガーをシミュレート
     const FVector ToTarget = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal();
     SetActorRotation(ToTarget.Rotation());
+    WeaponHandler->FirePrimary();
 }
 
 AActor* ABXEnemyCharacter::GetNextPatrolPoint()

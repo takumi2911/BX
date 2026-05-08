@@ -8,6 +8,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
+#include "Systems/BXAlertSubsystem.h"
 
 ABXDronePawn::ABXDronePawn()
 {
@@ -36,6 +37,11 @@ void ABXDronePawn::BeginPlay()
     Super::BeginPlay();
     InitFromArchetype();
     SetDroneState(EBXDroneState::Patrol);
+
+    if (UBXAlertSubsystem* AlertSys = GetWorld()->GetSubsystem<UBXAlertSubsystem>())
+    {
+        AlertSys->RegisterDrone(this);
+    }
 }
 
 void ABXDronePawn::Tick(float DeltaTime)

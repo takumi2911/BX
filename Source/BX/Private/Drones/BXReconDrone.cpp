@@ -1,7 +1,7 @@
 // Copyright (c) takumi2911 - BlackoutExfil
 #include "Drones/BXReconDrone.h"
 #include "Characters/BXEnemyCharacter.h"
-#include "Kismet/GameplayStatics.h"
+#include "Systems/BXAlertSubsystem.h"
 
 ABXReconDrone::ABXReconDrone()
 {
@@ -19,18 +19,8 @@ void ABXReconDrone::NotifyPlayerSpotted(AActor* SpottedActor)
 
 void ABXReconDrone::PropagateAlertToNearbyEnemies(AActor* SpottedActor)
 {
-    TArray<AActor*> NearbyActors;
-    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ABXEnemyCharacter::StaticClass(), NearbyActors);
-
-    for (AActor* Actor : NearbyActors)
+    if (UBXAlertSubsystem* AlertSys = GetWorld()->GetSubsystem<UBXAlertSubsystem>())
     {
-        ABXEnemyCharacter* Enemy = Cast<ABXEnemyCharacter>(Actor);
-        if (!Enemy || Enemy->IsDead()) { continue; }
-
-        const float Dist = FVector::Dist(GetActorLocation(), Enemy->GetActorLocation());
-        if (Dist <= AlertPropagationRadius)
-        {
-            Enemy->SetEnemyState(EBXEnemyState::Alert);
-        }
+        AlertSys->BroadcastAlertToEnemies(this, GetActorLocation(), AlertPropagationRadius);
     }
 }
