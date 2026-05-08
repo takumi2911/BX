@@ -8,7 +8,12 @@ public class BX : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayTags", "Niagara", "UMG" });
+		PublicDependencyModuleNames.AddRange(new string[] {
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			"GameplayTags", "Niagara", "UMG",
+			// AI / BehaviorTree (Sprint 24)
+			"AIModule", "NavigationSystem", "GameplayTasks"
+		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "Json", "JsonUtilities" });
 

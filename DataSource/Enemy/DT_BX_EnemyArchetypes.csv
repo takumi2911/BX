@@ -1,0 +1,4 @@
+---,ArchetypeId,DisplayName,InitialArmorItemId,InitialWeaponId,InitialAmmoId,InitialAmmoCount,HPMultiplier,SightRadius,HearingRadius,AttackRange,AttackCooldownSec,WalkSpeed,AlertSpeed,CombatSpeed,BaseAccuracy,CreditsOnKill,Description
+Guard,Guard,Guard,armor_class2_vest,weapon_ak74,ammo_545x39_ps,30,1.0,1500.0,800.0,700.0,0.8,200.0,320.0,420.0,0.55,50,Standard patrol guard. Medium armor and AK-74.
+Soldier,Soldier,Soldier,armor_class3_vest,weapon_m4a1,ammo_556x45_m855,30,1.3,1800.0,900.0,800.0,0.7,220.0,360.0,460.0,0.65,100,Elite soldier. Heavy armor and M4A1. Higher accuracy and HP.
+Scout,Scout,Scout,NAME_None,weapon_smg_mp5,ammo_9x19_rip,25,0.8,2000.0,1000.0,600.0,0.6,280.0,420.0,520.0,0.7,75,Fast-moving scout. No armor but high sight range and speed.

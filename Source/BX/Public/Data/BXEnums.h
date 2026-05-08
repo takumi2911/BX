@@ -285,6 +285,28 @@ enum class EBXLanguage : uint8
     English  UMETA(DisplayName = "English"),
 };
 
+// 敵 AI 状態 (Sprint 24)
+UENUM(BlueprintType)
+enum class EBXEnemyState : uint8
+{
+    Idle    UMETA(DisplayName = "Idle"),
+    Patrol  UMETA(DisplayName = "Patrol"),
+    Alert   UMETA(DisplayName = "Alert"),
+    Combat  UMETA(DisplayName = "Combat"),
+    Dead    UMETA(DisplayName = "Dead"),
+};
+
+// ドローン AI 状態 (Sprint 26)
+UENUM(BlueprintType)
+enum class EBXDroneState : uint8
+{
+    Idle    UMETA(DisplayName = "Idle"),
+    Patrol  UMETA(DisplayName = "Patrol"),
+    Track   UMETA(DisplayName = "Track"),
+    Attack  UMETA(DisplayName = "Attack"),
+    Dead    UMETA(DisplayName = "Dead"),
+};
+
 // インタラクト対象種別 (SPEC §23-7)
 UENUM(BlueprintType)
 enum class EBXInteractTargetType : uint8
